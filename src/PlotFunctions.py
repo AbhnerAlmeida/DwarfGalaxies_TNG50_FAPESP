@@ -38,7 +38,8 @@ from style_registry import (markers, msize, colors, edgecolors,
 from utils import colored_line, _scatter_with_colorbar
 
 import sys
-sys.path.append("/home/abhner/Documents/PROJETOS/DwarfGalaxies_TNG50_at_IAG")
+sys.path.append("/home/abhner/Documents/PROJETOS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes")
+sys.path.append("/home/abhner/Documents/PROJETOS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
 
 
 
