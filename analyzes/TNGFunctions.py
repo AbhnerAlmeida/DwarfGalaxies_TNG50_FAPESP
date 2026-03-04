@@ -3,7 +3,7 @@ import shutil
 import os
 
 import sys
-sys.path.append("/home/abhner/Documents/PROJETOS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
+sys.path.append(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
 
 import pandas as pd
 import numpy as np

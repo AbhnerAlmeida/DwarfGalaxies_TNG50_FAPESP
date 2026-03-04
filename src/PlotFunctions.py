@@ -38,8 +38,8 @@ from style_registry import (markers, msize, colors, edgecolors,
 from utils import colored_line, _scatter_with_colorbar
 
 import sys
-sys.path.append("/home/abhner/Documents/PROJETOS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes")
-sys.path.append("/home/abhner/Documents/PROJETOS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
+sys.path.append(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes")
+sys.path.append(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
 
 
 
@@ -66,7 +66,7 @@ h = 0.6774
 SaveSubhaloPath = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/'
 SIMTNG = 'TNG50'
 Nsim = '-1'
-dfTime = pd.read_csv(os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/SNAPS_TIME.csv')
+dfTime = pd.read_csv(os.getenv("HOME")+'/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/utils/SNAPS_TIME.csv')
 
 
 def format_func_loglog(value, tick_number):
