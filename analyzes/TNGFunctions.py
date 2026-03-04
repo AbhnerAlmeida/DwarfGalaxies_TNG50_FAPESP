@@ -1,3 +1,20 @@
+"""
+TNGFunctions
+============
+
+Utilities for analysing subhalo evolution in the IllustrisTNG simulations.
+
+This module contains functions to extract merger tree histories,
+compute derived physical quantities, and generate evolution
+dataframes used in the analysis of dwarf galaxy evolution.
+
+Author
+------
+Abhner P. de Almeida
+abhner.almeida AT usp.br
+University of São Paulo (USP)
+"""
+
 import h5py
 import shutil
 import os
@@ -62,6 +79,19 @@ component = {
         '5': 'bhs',
 }
 
+def _as_id_list(ids):
+    """Normalize IDs to a Python list[int]."""
+    if isinstance(ids, (int, np.integer)):
+        return [int(ids)]
+    return [int(x) for x in np.atleast_1d(ids)]
+
+
+def _ensure_dir(path):
+    """Create directory if needed (including parents)."""
+    if path is None or path == '':
+        return
+    os.makedirs(str(path), exist_ok=True)
+    
 def extractDF(Name, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' , 
               MERGER = False, SUBHALO = False, ACCRETED = False, EXsituINsitu = False, SIM = 'TNG50', fmt = 'csv'):
     '''
@@ -78,26 +108,31 @@ def extractDF(Name, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' ,
     -------
     Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     '''
+    base = os.path.join(PATH, SIM)
+
     if SUBHALO:
-        PATH = PATH + '/' + SIM + '/Subhalos'
-        df = h5py.File(PATH+'/'+Name+".hdf5", 'r')
+        fpath = os.path.join(base, "Subhalos", f"{Name}.hdf5")
+        df = h5py.File(str(fpath), "r")
+
     elif MERGER:
-        PATH = PATH + '/' + SIM + '/DFs/Analysis/Mergers'
-        df = pd.read_csv(PATH+'/'+Name+"."+fmt, index_col=0)
+        fpath = os.path.join(base, "DFs", "Analysis", "Mergers", f"{Name}.{fmt}")
+        df = pd.read_csv(fpath, index_col=0)
 
     elif ACCRETED:
-        PATH = PATH + '/' + SIM + '/DFs/Analysis/RecentAccretedParticle'
-        df = pd.read_csv(PATH+'/'+Name+"."+fmt, index_col=0)
-        
+        fpath = os.path.join(base, "DFs", "Analysis", "RecentAccretedParticle", f"{Name}.{fmt}")
+        df = pd.read_csv(fpath, index_col=0)
+
     elif EXsituINsitu:
-        PATH = PATH + '/' + SIM + '/DFs/Analysis/StellarContent'
-        df = pd.read_csv(PATH+'/'+Name+"."+fmt, index_col=0)
+        fpath = os.path.join(base, "DFs", "Analysis", "StellarContent", f"{Name}.{fmt}")
+        df = pd.read_csv(fpath, index_col=0)
 
     else:
-        PATH = PATH + '/' + SIM + '/DFs'
-        df = pd.read_csv(PATH+'/'+Name+"."+fmt, index_col=0)
+        fpath = os.path.join(base, "DFs", f"{Name}.{fmt}")
+        df = pd.read_csv(fpath, index_col=0)
 
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    # Drop pandas' unnamed index columns if present
+    if isinstance(df, pd.DataFrame):
+        df = df.loc[:, ~df.columns.astype(str).str.contains(r"^Unnamed")]
 
     return df
 
@@ -117,10 +152,8 @@ def getsuplementary(Name, PATH=os.getenv("HOME")+'/SIMS/TNG' ,
     Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     '''
 
-    PATH = PATH + '/' + SIM + '/suplementary'
-    df = h5py.File(PATH+'/'+Name+".hdf5", 'r')
-    
-    return df
+    fpath = os.path.join(PATH, SIM, "suplementary", f"{Name}.hdf5")
+    return h5py.File(str(fpath), "r")
 
 def getMock(Name, PATH=os.getenv("HOME")+'/SIMS/TNG' , 
              SIM = 'TNG50-1', CATALOG = 'sdss', SNAP = 'snapnum_099'):
@@ -138,10 +171,8 @@ def getMock(Name, PATH=os.getenv("HOME")+'/SIMS/TNG' ,
     Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     '''
 
-    PATH = PATH + '/' + SIM + '/MOCK/'+CATALOG+'/'+SNAP
-    df = h5py.File(PATH+'/'+Name+".hdf5", 'r')
-    
-    return df
+    fpath = os.path.join(PATH, SIM, "MOCK", CATALOG, SNAP, f"{Name}.hdf5")
+    return h5py.File(str(fpath), "r")
 
 def initialDF(PATH = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory', verbose = False, SIM='TNG50', NSim = '-1',snapnum=99, fmt = 'csv'):
     """Extract all the subhalos and save in PATH
@@ -157,11 +188,11 @@ def initialDF(PATH = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory', verbose =
         print('\n Taking DF for ALL subhalos ...')
 
     try:
-        extractDF('All')
+        df_z0 = extractDF("All", SIM=SIM)
         if verbose:
             print('Luckily you already have DF for ALL subhalos ...')
 
-    except:
+    except Exception:
         if verbose:
             print('You don\'t have df for ALL subhalos, I will make for you ...')
 
@@ -176,7 +207,7 @@ def initialDF(PATH = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory', verbose =
                                                                         
     
         #Take only the stars Mass and Size, and also computes Sigma_eff
-        Mass_star = Mass_all*1e10/h # Modot
+        Mass_star = Mass_all*1e10/h # Msun
         Rad_eff = (Rad_all/h) / (1+dfTime.z.loc[dfTime.Snap == snapnum].values[0])  # kpc, a = 1 (z = 0)
     
         Mass_star = np.log10(Mass_star)
@@ -185,7 +216,10 @@ def initialDF(PATH = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory', verbose =
         ids = np.linspace(0, len(Flags)-1, len(Flags))
         ids = np.array([int(value) for value in ids])
 
-        data = {'SubfindID_99': ids,'logMstarRad_99':Mass_star,  'logHalfRadstar_99': Rad_eff, 'Flags': Flags}
+        data = {'SubfindID_99': ids,
+                'logMstarRad_99':Mass_star,  
+                'logHalfRadstar_99': Rad_eff, 
+                'Flags': Flags}
     
         df_z0 = pd.DataFrame(data)
         df_z0.to_pickle(PATH+'/'+SIM+'/DFs/'+'All.'+fmt)
@@ -204,16 +238,27 @@ def DownloadSubhalo(ID, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' , 
         -------
         Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
         '''
+        cache_dir = os.path.join(PATH, SIM, "Subhalos")
+        _ensure_dir(cache_dir)
+
+        cached = cache_dir / f"{int(ID)}.hdf5"
         try:
-                file = h5py.File(PATH+'/'+SIM+'/Subhalos/'+str(int(ID))+'.hdf5', 'r') 
-        except:
-                print('You don\'t have the file for '+str(ID))
-                file = ETNG.History(int(ID), sim=SIM+NSim, snapnum=snapnum)
-                file.close()
-                hdf5_path = os.getenv("HOME")+'/SIMS/TNG/'+SIM+NSim+'/output'
-                shutil.copyfile(hdf5_path+'/sublink_mpb_'+str(int(ID))+'.hdf5', PATH+'/'+SIM+'/Subhalos/'+str(int(ID))+'.hdf5')
-                file = h5py.File(PATH+'/'+SIM+'/Subhalos/'+str(int(ID))+'.hdf5', 'r') 
-        return file
+            return h5py.File(str(cached), "r")
+        except Exception:
+            print(f"You don't have the file for {ID}")
+
+        # Generate with ETNG (assumed to write to ~/SIMS/TNG/<SIM+NSim>/output/)
+        f = ETNG.History(int(ID), sim=SIM + NSim, snapnum=snapnum)
+        try:
+            f.close()
+        except Exception:
+            pass
+
+        etng_out = os.path.join(os.getenv("HOME"), "SIMS", "TNG", f"{SIM}{NSim}", "output")
+        src = etng_out / f"sublink_mpb_{int(ID)}.hdf5"
+        shutil.copyfile(src, cached)
+
+        return h5py.File(str(cached), "r")
     
 def CleanAllSubhalos(ID, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' , SIM = 'TNG50', NSim = '-1', snapnum = 99):
     """
@@ -221,14 +266,18 @@ def CleanAllSubhalos(ID, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' ,
     """
    
     
-    for path in [os.getenv("HOME")+'/SIMS/TNG/'+SIM+NSim+'/output'+'/sublink_mpb_'+str(int(ID))+'.hdf5', PATH+'/'+SIM+'/Subhalos/'+str(int(ID))+'.hdf5']:
+    candidates = [
+        os.path.join(os.getenv("HOME"), "SIMS", "TNG", f"{SIM}{NSim}", "output", f"sublink_mpb_{int(ID)}.hdf5"),
+        os.path.join(PATH, SIM, "Subhalos", f"{int(ID)}.hdf5"),
+    ]
 
+    for p in candidates:
         try:
-            os.remove(path)
+            p.unlink()
         except Exception:
             pass
-        
-    print("Todos os subhalos temporários foram limpos.")
+
+    print("All temporally subhalos are removed")
 
 
 def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'): 
@@ -248,12 +297,12 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
         try:
                 file = h5py.File(pathfile,'r') 
                 Progenitor = file['FirstProgenitorID'][0]
-        except:
+        except Exception:
                 pathfile = os.getenv("HOME") + "/SIMS/TNG/" + SIM + NSim + "/output/" + 'dic_99_'+str(ID)+'.csv'
                 
                 try:
                         file = pd.read_csv(pathfile, index_col = 0)
-                except:
+                except Exception:
                         file = ETNG.getsubhalo(ID, simulation=SIM + NSim)
                         
                         file = pd.DataFrame.from_dict(file)
@@ -263,7 +312,7 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
                 Progenitor = file['related']['sublink_progenitor']
                 
        
-        if Progenitor != None:
+        if Progenitor is not None:
                 
                 file = DownloadSubhalo(ID)
                 if 'Group' in param or 'over_R_Crit200' in param:
@@ -280,7 +329,7 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
                                         IDCen = IDFirstSubFirstGroup[str(ID)][0]
                                         file =  DownloadSubhalo(IDCen)
                                         param = param.replace('FirstGroup', '')
-                                except:
+                                except Exception:
                                         data = np.log10(subhaloCen['Group_M_Crit200'][:]*1e10/h)
                                         data = data[:int(99 - 33)] # start after z = 2
 
@@ -304,7 +353,7 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
                                         IDCen = IDFirstSubFirstGroup[str(ID)][0]
                                         file =  DownloadSubhalo(IDCen)
                                         param = param.replace('FinalGroup', '')
-                                except:
+                                except Exception:
                                         data = np.log10(subhaloCen['Group_M_Crit200'][:]*1e10/h)
                                         data = data[:int(99 - 33)] # start after z = 2
 
@@ -344,8 +393,7 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
                                 posCen = np.array([file['SubhaloPos'][:, 0], 
                                                 file['SubhaloPos'][:, 1],
                                                 file['SubhaloPos'][:, 2]]).T
-                                
-                                print('Differ computing')
+                   
                                 
                                 while len(pos) < 100:
                                         pos = np.append(pos,  [[np.nan, np.nan, np.nan]], axis=0)
@@ -594,7 +642,6 @@ def EvolutionDF(param, IDs, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory
         if verbose:
             print(f"Loading existing dataframe from {file_path}")
         df = pd.read_csv(file_path)
-        NewData = False
     else:
         if verbose:
             print("Creating new dataframe")
@@ -603,8 +650,6 @@ def EvolutionDF(param, IDs, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory
                          columns=np.append('Snap', IDs))
         df[:] = np.nan
         df.Snap = np.flip(snaps)
-        NewData = True
-    
     
     # Process each ID
     if CheckNewDATA:
@@ -624,11 +669,10 @@ def EvolutionDF(param, IDs, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory
             
             # If we get here, we need to process this ID
             print(f'Processing Subhalo: {ID}')
-            NewData = True
             
             try:
                 data = ImportField(param, ID)
-            except:
+            except Exception:
                 data = np.array([])
             
             # Ensure data has length 100
@@ -646,7 +690,7 @@ def EvolutionDF(param, IDs, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory
             
             try:
                 df.to_csv(file_path)
-            except: 
+            except Exception: 
                 # Create directories if they don't exist
                 path = PATH
                 NewPATH = f"{SIM}/{SAVEFILE}/"
@@ -680,7 +724,7 @@ def EvolutionComposeDF(param, IDs, PATH = os.getenv("HOME")+'/TNG_Analyzes/Subha
         df = extractDF(param, SIM = SIM)
         NewData = False
 
-    except:
+    except Exception:
         if param == 'sSFRCoreRatio':
             dfsSFRInHalfRad = EvolutionDF('SubhalosSFRinHalfRad', IDs, SIM = SIM)
             dfsSFR = EvolutionDF('SubhalosSFR', IDs, SIM = SIM)
@@ -759,7 +803,7 @@ def EvolutionComposeDF(param, IDs, PATH = os.getenv("HOME")+'/TNG_Analyzes/Subha
 
         try:
             df.to_csv(PATH+'/'+SIM+'/'+SAVEFILE+'/'+param+'.'+fmt)       
-        except: 
+        except Exception: 
             path = PATH
             NewPATH = SIM+'/'+SAVEFILE+'/'
             directories = NewPATH.split('/')
@@ -795,14 +839,6 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
     SubhaloHalfmassRadType0 = extractDF('SubhaloHalfmassRadType0')
     SubhaloHalfmassRadType4 = extractDF('SubhaloHalfmassRadType4')
     SubhaloHalfmassRadType1 = extractDF('SubhaloHalfmassRadType1')
-    
-    #SubhaloCM1 = extractDF('SubhaloCM1')
-    #SubhaloCM2 = extractDF('SubhaloCM2')
-    #SubhaloCM3 = extractDF('SubhaloCM3')
-    
-    #SubhaloVel1 = extractDF('SubhaloVel1')
-    #SubhaloVel2 = extractDF('SubhaloVel2')
-    #SubhaloVel3 = extractDF('SubhaloVel3')
     
     GroupFirstSub  = extractDF('GroupFirstSub')
     Group_M_Crit200  = extractDF('Group_M_Crit200')
@@ -966,7 +1002,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                     df[str(ID)] = np.nan
             
             
-        except:
+        except Exception:
             print('NaN df')
             snaps= np.arange(100)
             df = pd.DataFrame(data=np.zeros((100,len(IDs) + 1), dtype=object), columns= np.append('Snap', IDs))
@@ -993,18 +1029,15 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
             rh = SubhaloHalfmassRadType4[str(ID)].values[int(99 - rh)]
 
         elif SizeLim == '2RhpkpcCurrent' or  SizeLim == 'AbovestdRhpkpcCurrent':
-            rHGasArray = np.array([2*10**v for v in SubhaloHalfmassRadType0[str(ID)].values])
             rHStarArray = np.array([2*10**v for v in SubhaloHalfmassRadType4[str(ID)].values])
             rHDMArray = np.array([2*10**v for v in SubhaloHalfmassRadType1[str(ID)].values])
             
         elif SizeLim == 'RhpkpcCurrent' or  SizeLim == 'AbovestdRhpkpcCurrent':
-            rHGasArray = np.array([10**v for v in SubhaloHalfmassRadType0[str(ID)].values])
             rHStarArray = np.array([10**v for v in SubhaloHalfmassRadType4[str(ID)].values])
             rHDMArray = np.array([10**v for v in SubhaloHalfmassRadType1[str(ID)].values])
             
         elif SizeLim[2:] == 'XRhpkpcCurrent':
             print('Times: '+str(int(SizeLim[:2])))
-            rHGasArray = np.array([int(SizeLim[:2])*10**v for v in SubhaloHalfmassRadType0[str(ID)].values])
             rHStarArray = np.array([int(SizeLim[:2])*10**v for v in SubhaloHalfmassRadType4[str(ID)].values])
             rHDMArray = np.array([int(SizeLim[:2])*10**v for v in SubhaloHalfmassRadType1[str(ID)].values])
             
@@ -1059,7 +1092,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
             
             SnapsAt0 = dfTime.Snap.loc[(dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] < 0.15) & (dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] > 0) &  (dfTime.Snap > int(99 - argBirth))].values
             SnapsAt1 = dfTime.Snap.loc[(dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] < 1.1) & (dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] > 0.9) &  (dfTime.Snap > int(99 - argBirth))].values
-            SnapsAt2 = dfTime.Snap.loc[(dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] < 2.25) & (dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] > 1.75) &  (dfTime.Snap > int(99 - argBirth))].values
+            #SnapsAt2 = dfTime.Snap.loc[(dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] < 2.25) & (dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] > 1.75) &  (dfTime.Snap > int(99 - argBirth))].values
             #SnapsAt4 = dfTime.Snap.loc[(dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] < 4.25) & (dfTime.Age - dfTime.Age.loc[dfTime.Snap == int(99 - argBirth)].values[0] > 3.75) &  (dfTime.Snap > int(99 - argBirth))].values
             Snaps = np.concatenate([[int(99 - argBirth)], SnapsAt0, SnapsAt1])#, SnapsAt2, SnapsAt4])
             Snaps = np.unique(Snaps)
@@ -1111,7 +1144,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
             
             try:
                 f = extractParticles(ID, snaps = [snap])[0]
-            except:
+            except Exception:
                 print('Failed to get Particle')
                 continue
             
@@ -1124,7 +1157,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                 massGas = f['PartType0']['Masses'][:] * 1e10 / h
                 velGas= f['PartType0']['Velocities'][:] * scalefactorsqrt
                 
-            except:
+            except Exception:
                 IDsGas_Current = np.array([0])
                 posGas = np.array([[0, 0, 0]])
                 massGas = np.array([0])
@@ -1137,7 +1170,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                 massDM = f['Header'].attrs['MassTable'][1]*np.ones(len(f['PartType1']['Coordinates'])) * 1e10 / h
                 velDM =  f['PartType1']['Velocities'][:] * scalefactorsqrt
 
-            except:
+            except Exception:
                 posDM = np.array([[0, 0, 0]])
                 IDsDM_Current = massDM = np.array([0])
                 velDM =  np.array([[0, 0, 0]])
@@ -1150,7 +1183,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                 massStar = f['PartType4']['Masses'][:] * 1e10 / h
                 ZStar = f['PartType4']['GFM_Metallicity'][:] /  0.0127
                 AgeStar = ETNG.AgeUniverse(Omegam0,h,1/(f['PartType4']['GFM_StellarFormationTime'][:]) - 1)
-            except:
+            except Exception:
                 posStar = np.array([[0, 0, 0]])
                 IDsStar_Current = massStar = np.array([0])
                 velStar =  np.array([[0, 0, 0]])
@@ -1222,7 +1255,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                 if 'SFR' in Param:
                     try:
                         SFR =  f['PartType0']['StarFormationRate'][:] 
-                    except:
+                    except Exception:
                         SFR = np.array([0])
                 Cond = None
                 
@@ -1658,7 +1691,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                         
                         try:
                             R200ForJ = R[rho >= rhocrit200][-1]
-                        except:
+                        except Exception:
                             Rlog10 = np.log10(R)
                             rholog10 = np.log10(rho)
 
@@ -1667,7 +1700,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                             
                         try:
                             M200ForJ = MassCum[rho >= rhocrit200][-1]
-                        except:
+                        except Exception:
                             Rlog10 = np.log10(R)
                             MassCumlog10 = np.log10(MassCum)
 
@@ -1758,7 +1791,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
 
                              try:
                                  IDsParticle_at_SnapBreak = f_at_SnapBreak['PartType4']['ParticleIDs'][:]
-                             except:
+                             except Exception:
                                  Tag[CondSnap] = 100 #100 -> ExSitu
                                  continue
 
@@ -1785,7 +1818,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                             CondIII = Cond & CondII
                             Cond = CondIII
                             
-                     except:
+                     except Exception:
                         continue
                         
                 if 'AgeStarAfterEntry' in Param:
@@ -1998,7 +2031,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                     if 'SFMass' in Param:
                         try:
                             SFR =  f['PartType0']['StarFormationRate'][:] 
-                        except:
+                        except Exception:
                             SFR = np.array([0])
                             
                         Cond = Cond & (SFR > 0)
@@ -2113,7 +2146,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                         try:
                             u = f['PartType0']['InternalEnergy'][:]
                             xe = f['PartType0']['ElectronAbundance'][:]
-                        except:
+                        except Exception:
                             DFs[l][str(ID)][99 - snap] = np.nan
                             
                         Xh = 0.76
@@ -2374,7 +2407,7 @@ def makedata(names, columns, row, Type, snap=[99], dfName='Sample', Name = 'Name
              
                         dataName.append(values.iloc[int(99 - snap[0])].values)
 
-                    except:
+                    except Exception:
                         values = extractPopulation(
                             name + split, dfName=dfName, Name = Name,  SIM = SIM)
                         dataName.append(values[param].values)
@@ -2412,7 +2445,7 @@ def makeDF(population, param, dfName = 'Sample', Name = 'Name', IDs=None,  TreeH
     try: 
         dfEvolution = extractDF(param, PATH=PATH)
         
-    except:
+    except Exception:
         if verbose:
             print('You don\'t have the DF for this case')
 
@@ -2437,23 +2470,23 @@ def makeDF(population, param, dfName = 'Sample', Name = 'Name', IDs=None,  TreeH
             keys = dSample[SubfindIDkey]
             try:
                 df = dfEvolution[keys.astype(str)].copy()
-            except:
+            except Exception:
                 df = pd.DataFrame()
                 for key in keys:
                     try:
                         df[str(key)] = dfEvolution[str(key)].copy()
-                    except:
+                    except Exception:
                         continue
         else:
             keys = IDs
             try:
                 df = dfEvolution[keys.astype(str)].copy()
-            except:
+            except Exception:
                 df = pd.DataFrame()
                 for key in keys:
                     try:
                         df[str(key)] = dfEvolution[str(key)].copy()
-                    except:
+                    except Exception:
                         continue
                     
     else:
@@ -2887,7 +2920,7 @@ def make_profile(ID99, snap, Ycase, PartType, dfSample = None, Entry = False, Hi
         print('ID: ', ID)
         try:
             file = extractParticles(ID, snaps = [snap])[0]
-        except:
+        except Exception:
             continue
         
         try:
@@ -2899,7 +2932,7 @@ def make_profile(ID99, snap, Ycase, PartType, dfSample = None, Entry = False, Hi
             Vmean = np.array([MATH.weighted_median(velStar[:, 0], massStar), MATH.weighted_median(velStar[:, 1], massStar), MATH.weighted_median(velStar[:, 2], massStar)])
             CenFind = True
             
-        except:
+        except Exception:
             posStar = velStar =  np.array([0, 0, 0])
             massStar = np.array([0])  
             CenFind = False
@@ -2917,7 +2950,7 @@ def make_profile(ID99, snap, Ycase, PartType, dfSample = None, Entry = False, Hi
                 Vmean = np.array([MATH.weighted_median(velGas[:, 0], massGas), MATH.weighted_median(velGas[:, 1], massGas), MATH.weighted_median(velGas[:, 2], massGas)])
                 CenFind = True
                 
-        except:
+        except Exception:
             posGas = velGas = np.array([0, 0, 0])
             massGas = np.array([0])
         
@@ -2934,7 +2967,7 @@ def make_profile(ID99, snap, Ycase, PartType, dfSample = None, Entry = False, Hi
                 Vmean = np.array([MATH.weighted_median(velDM[:, 0], massDM), MATH.weighted_median(velDM[:, 1], massDM), MATH.weighted_median(velDM[:, 2], massDM)])
                 CenFind = True
            
-        except:
+        except Exception:
             posDM = velDM = np.array([0, 0, 0])
             massDM = np.array([0])
             
@@ -3539,7 +3572,7 @@ def extractParticles(SubfindID99, snaps = [99], IDatSnap = False,
                 if IDatSnap:
                     return h5py.File(hdf5_path, 'r')
         
-            except:
+            except Exception:
                 ETNG.saveParticles(SubfindID, snapnum=snap)
     
                 if IDatSnap:
@@ -3563,7 +3596,7 @@ def extractParticles(SubfindID99, snaps = [99], IDatSnap = False,
                 shutil.copyfile(hdf5_path, PATH+'/Particles/'+str(SubfindID99)+'/'+str(snap)+'.hdf5')
                 
 
-        except:
+        except Exception:
             path = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/'+SIMTNG
             for name in ['Particles', str(SubfindID99)]:
                 path = os.path.join(path, name)
@@ -3598,7 +3631,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
             if Rad == 0:
                 Rad = 2.*10**SubhaloHalfMassRadType4[str(SubfindID99)].loc[SubhaloHalfMassRadType4.Snap == snap].values[0]
             
-        except:
+        except Exception:
             continue
 
         
@@ -3625,7 +3658,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
             VelMean = np.array([MATH.weighted_median(velStar[:, 0], massStar), MATH.weighted_median(velStar[:, 1], massStar), MATH.weighted_median(velStar[:, 2], massStar)])
             CenFind = True
             
-        except:
+        except Exception:
             posStar = velStar =  np.array([0, 0, 0])
             massStar = np.array([0])  
             CenFind = False
@@ -3640,7 +3673,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
                 VelMean = np.array([MATH.weighted_median(velGas[:, 0], massGas), MATH.weighted_median(velGas[:, 1], massGas), MATH.weighted_median(velGas[:, 2], massGas)])
                 CenFind = True
                 
-        except:
+        except Exception:
             posGas = velGas = np.array([0, 0, 0])
             massGas = np.array([0])
             
@@ -3656,7 +3689,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
                 VelMean = np.array([MATH.weighted_median(velDM[:, 0], massDM), MATH.weighted_median(velDM[:, 1], massDM), MATH.weighted_median(velDM[:, 2], massDM)])
                 CenFind = True
            
-        except:
+        except Exception:
             posDM = velDM = np.array([0, 0, 0])
             massDM = np.array([0])
             
@@ -3664,7 +3697,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
             posBH = file['PartType5']['Coordinates'][:] * factor
             velBH = file['PartType5']['Velocities'][:] * scalefactorsqrt
            
-        except:
+        except Exception:
             posBH = velBH = np.array([0, 0, 0])
             
         
@@ -3728,7 +3761,7 @@ def corrected(SubfindID99, snaps = [99], PATH = os.getenv("HOME")+'/TNG_Analyzes
                     ang_mom = np.sum(np.cross(posStar[RadMass < Rad], MassInRad[:, np.newaxis] * velStar[RadMass < Rad]), axis=0)
 
 
-                except:
+                except Exception:
                     RadMass = np.linalg.norm(posDM, axis = 1)
                     MassInRad = massDM[RadMass < Rad]
                     ang_mom = np.sum(np.cross(posDM[RadMass < Rad], MassInRad[:, np.newaxis] * velDM[RadMass < Rad]), axis=0)
@@ -3780,23 +3813,23 @@ def ExtractParticlesParameters(param, f, snap, scalefactorsqrt, PartType = 'Part
     if param == 'Coordinates':
         try:
             return f[PartType]['Coordinates'][:] / (1+dfTime.z.values[dfTime.Snap == snap]) / h 
-        except:
+        except Exception:
             return np.array([[0,0,0]])
     elif param == 'Velocities':
         try:
             return f[PartType]['Velocities'][:]  * scalefactorsqrt
-        except:
+        except Exception:
             return np.array([[0,0,0]])
     elif param == 'Masses':
         if PartType == 'PartType1':
             try:
                 return f['Header'].attrs['MassTable'][1]*np.ones(len(f['PartType1']['Coordinates'])) * 1e10 / h
-            except:
+            except Exception:
                 return np.array([0])
         else:
             try:
                 return f[PartType]['Masses'][:]  * 1e10 / h
-            except:
+            except Exception:
                 return np.array([0])
 
 def FixPeriodic_kpc(dx, snap, sim='TNG50-1'):
@@ -3910,12 +3943,12 @@ def ExtractExSituParticles(IDs, snaps = [99], UpdateParams = True):
                     
                     df.to_csv('/home/abhner/TNG_Analyzes/SubhaloHistory/TNG50/DFs/'+str(ID)+'_StellarContent.csv')
                     
-            except:
+            except Exception:
                 
                 f = extractParticles(ID, snaps = [snap])[0]
                 try:
                     as_Birth = np.array([a for a in f['PartType4']['GFM_StellarFormationTime'][:]])
-                except:
+                except Exception:
                     continue
                 IDsPart = np.array([idNum for idNum in f['PartType4']['ParticleIDs'][:]])
             
@@ -4035,7 +4068,7 @@ def ExtractExSituParticles(IDs, snaps = [99], UpdateParams = True):
                             f_at_SnapBreak = extractParticles(ID, snaps=[snapBreak])[0]
                             IDsParticle_at_SnapBreak = f_at_SnapBreak['PartType4']['ParticleIDs'][:]
     
-                        except:
+                        except Exception:
                             continue
                         
             
@@ -4060,7 +4093,7 @@ def ExtractRecentAccretedParticles(IDs, PartType = 'PartType0', snap = 99):
         print('ID: ', ID)
         try:
             df = extractDF(str(ID)+'_RecentAccretedContent')
-        except:
+        except Exception:
             f_Current = extractParticles(ID, snaps = [snap])[0]
             f_Previous = extractParticles(ID, snaps = [int(snap - 1)])[0]
 
@@ -4160,7 +4193,7 @@ def ReadingSIM(subhaloFindID_99, SIM = 'TNG50-1', baseURL = 'http://www.tng-proj
         Flag = Merger['Flag']
         return Main, Merger
 
-    except:
+    except Exception:
         print('ID: ', str(subhaloFindID_99))
         url = baseURL + SIM + '/snapshots/' + str(99) + '/subhalos/' + str(subhaloFindID_99)
         MergersDATA = ETNG.get(url+'/sublink/simple.json')
@@ -4279,7 +4312,7 @@ def ReadingSIM(subhaloFindID_99, SIM = 'TNG50-1', baseURL = 'http://www.tng-proj
         try:
             Main.to_csv(PATH+'/Analysis/Mergers/IDMain/'+str(subhaloFindID_99)+'.csv')
             Mergers.to_csv(PATH+'/Analysis/Mergers/IDMergers/'+str(subhaloFindID_99)+'.csv')
-        except:
+        except Exception:
             path = PATH
             for name in ['Analysis', 'Mergers', 'IDMain']:
                 path = os.path.join(path, name)
@@ -4345,10 +4378,10 @@ def CountMergers(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/api/',
                 Main = extractDF('/IDMain/'+str(subhaloFindID_99), MERGER = True)
                 Merger = extractDF('/IDMergers/'+str(subhaloFindID_99), MERGER = True)
                 
-            except:
+            except Exception:
                 #try:
                 #    Main, Merger = ReadingSIM(subhaloFindID_99)
-                #except:
+                #except Exception:
                 continue
 
             GasMassEx = 0
@@ -4386,7 +4419,7 @@ def CountMergers(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/api/',
                 DMMassMerger = Merger.SubhaloMassType1.loc[Merger.Snap == snap].values  * 1e10 / h
                 try:
                     FlagMerger = Merger['Flag'].loc[Merger.Snap == snap].values 
-                except:
+                except Exception:
                     break
                 SnapAgoMerger = Merger['Born_Ago'].loc[Merger.Snap == snap].values 
 
@@ -4539,11 +4572,11 @@ def MakeMergerAnalysis(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/ap
             try:
                 df = extractDF(str(subhaloFindID_99)+'s', MERGER = True)
                 
-            except:
+            except Exception:
                 try:
                     Main = extractDF('IDMain/'+str(subhaloFindID_99), MERGER = True)
                     Merger = extractDF('IDMergers/'+str(subhaloFindID_99), MERGER = True)
-                except:
+                except Exception:
                     continue
                 
                 df = Merger[['Snap',  'SubFindID']].copy()
@@ -4562,7 +4595,7 @@ def MakeMergerAnalysis(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/ap
                         continue
                     try:
                         MassMain = Main.SubhaloMass.loc[Main.Snap == snap].values[0] * 1e10 / h
-                    except:
+                    except Exception:
                         continue
                     GasMassMain = Main.SubhaloMassType0.loc[Main.Snap == snap].values[0]  * 1e10 / h
                     StarMassMain = Main.SubhaloMassType4.loc[Main.Snap == snap].values[0]  * 1e10 / h
@@ -4599,12 +4632,12 @@ def MakeMergerAnalysis(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/ap
                     
                     try:
                         FlagMerger = Merger['Flag'].loc[Merger.Snap == snap].values 
-                    except:
+                    except Exception:
                         FlagMerger = np.zeros(len(MassMerger))
                         FlagMerger[:] = 1
                     try:
                         SnapAgoMerger = Merger['Born_Ago'].loc[Merger.Snap == snap].values 
-                    except:
+                    except Exception:
                         SnapAgoMerger = np.zeros(len(MassMerger))
                         SnapAgoMerger[:] =  3
                     for i, massmerger in enumerate(MassMerger):
@@ -4868,7 +4901,7 @@ def MakeMergerAnalysis(SIM = 'TNG50-1', baseURL = 'http://www.tng-project.org/ap
                             
                 try:
                     df.to_csv(PATH+'/Analysis/Mergers/'+str(subhaloFindID_99)+'.csv')
-                except:
+                except Exception:
                     path = PATH
                     for name in ['Analysis', 'Mergers']:
                         path = os.path.join(path, name)
@@ -4897,7 +4930,7 @@ def compare_Sample_key(key, populations, dfName = 'Sample', Name = 'Name', RankS
                 Values2 = Sample2[key].values[~np.isnan(Sample2[key].values)]
                 
                 MATH.TestPermutation(Values1,Values2, roundmedian = 3, RankSums = RankSums, Moodtest = Moodtest, KStest = KStest)
-        except:
+        except Exception:
             df1 = makeDF(population[0], key,  Name = Name)
             df2 = makeDF(population[1], key,  Name = Name)
 
@@ -4945,7 +4978,7 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
     else:
         try:
             file = extractParticles(ID, snaps = [snap])[0]
-        except:
+        except Exception:
             return [0], [np.nan], [np.nan]
 
     try:
@@ -4959,7 +4992,7 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
         Vmean = np.array([MATH.weighted_median(velStar[:, 0], massStar), MATH.weighted_median(velStar[:, 1], massStar), MATH.weighted_median(velStar[:, 2], massStar)])
         CenFind = True
 
-    except:
+    except Exception:
         posStar = velStar =  np.array([0, 0, 0])
         massStar = np.array([0]) 
         JStar = massStar[:, np.newaxis]*(np.cross(posStar, velStar))
@@ -4981,7 +5014,7 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
             Vmean = np.array([MATH.weighted_median(velGas[:, 0], massGas), MATH.weighted_median(velGas[:, 1], massGas), MATH.weighted_median(velGas[:, 2], massGas)])
             CenFind = True
 
-    except:
+    except Exception:
         posGas = velGas = np.array([0, 0, 0])
         massGas = np.array([0])
         JGas = massGas[:, np.newaxis]*(np.cross(posGas, velGas))
@@ -5002,7 +5035,7 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
             Vmean = np.array([MATH.weighted_median(velDM[:, 0], massDM), MATH.weighted_median(velDM[:, 1], massDM), MATH.weighted_median(velDM[:, 2], massDM)])
             CenFind = True
 
-    except:
+    except Exception:
         posDM = velDM = np.array([0, 0, 0])
         massDM = np.array([0])
         JDM = massDM[:, np.newaxis]*(np.cross(posDM, velDM))
@@ -5111,7 +5144,7 @@ def MakeScatterParams(df_Param, df_Sample, ParamName, Mean_At_Time = [1, 2, 5, 8
     for ID in df_Sample.SubfindID_99.values:
         try:
             Param = np.array([v for v in df_Param[str(ID)].values])
-        except:
+        except Exception:
             continue
         SnapAtBirth = df_Sample.loc[df_Sample.SubfindID_99 == ID, 'SnapBorn'].values[0]
         SnapAtBirth = int(SnapAtBirth)
@@ -5226,7 +5259,7 @@ def MedianPhases(AllValues, Allphases, func = np.nanmedian, nboots = 100):
 
         return Finalphase, FinalValue, FinalError
     
-    except:
+    except Exception:
         Allphases = np.zeros(Allphases)
         Allphases[Allphases == 0 ] = np.nan
         return  Allphases,Allphases, Allphases
@@ -5246,7 +5279,7 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
         
         try:
             Values = np.flip(np.array([v for v in dfParam[str(ID)].values]))
-        except:
+        except Exception:
             Values = np.zeros(100)
             Values = np.nan
         checkIfPreprocessing = False #dfStudy.loc[dfStudy['SubfindID_99'] == ID, 'PreProcessingGalaxy'].values[0] == 'PreProcessingGalaxy'
@@ -5306,7 +5339,7 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
     Finalphase, FinalValue, FinalError = MedianPhases(AllValues, Allphases)
     
     return Finalphase, FinalValue, FinalError
-    #except:
+    #except Exception:
     #    Finalphase = np.zeros(100)
     #    Finalphase[Finalphase == 0] = np.nan
     #    FinalValue = Finalphase
@@ -5329,7 +5362,7 @@ def ParticleParameters(f, ID, snap):
         massGas = f['PartType0']['Masses'][:] * 1e10 / h
         velGas= f['PartType0']['Velocities'][:] * scalefactorsqrt
         
-    except:
+    except Exception:
         IDsGas = np.array([0])
         posGas = np.array([[0, 0, 0]])
         massGas = np.array([0])
@@ -5341,7 +5374,7 @@ def ParticleParameters(f, ID, snap):
         massDM = f['Header'].attrs['MassTable'][1]*np.ones(len(f['PartType1']['Coordinates'])) * 1e10 / h
         velDM =  f['PartType1']['Velocities'][:] * scalefactorsqrt
 
-    except:
+    except Exception:
         posDM = np.array([[0, 0, 0]])
         IDsDM = massDM = np.array([0])
         velDM =  np.array([[0, 0, 0]])
@@ -5354,7 +5387,7 @@ def ParticleParameters(f, ID, snap):
         massStar = f['PartType4']['Masses'][:] * 1e10 / h
         ZStar = f['PartType4']['GFM_Metallicity'][:] /  0.0127
 
-    except:
+    except Exception:
         posStar = np.array([[0, 0, 0]])
         IDsStar = massStar = np.array([0])
         velStar =  np.array([[0, 0, 0]])
@@ -5507,7 +5540,7 @@ def get_evolution_accreted_particles(Params, IDs, dfSample, rterm=2,
                         print(f'  Adding new subhalo ID: {ID}')
                     df[str(ID)] = np.nan
                     
-        except:
+        except Exception:
             # Create new dataframe if loading fails
             if verbose > 0:
                 print(f'  Creating new dataframe for {Param}')
@@ -5745,7 +5778,7 @@ def get_evolution_accreted_particles(Params, IDs, dfSample, rterm=2,
                                     else:
                                         Tag[IDsPart == idNum] = 100   # Ex-situ
                                         
-                            except:
+                            except Exception:
                                 Tag[CondSnap] = 100  # Default to ex-situ if loading fails
                                 continue
                         
@@ -6267,7 +6300,7 @@ def process_single_subhalo(args):
                                 else:
                                     Tag[IDsPart == idNum] = 100   # Ex-situ
                                     
-                        except:
+                        except Exception:
                             Tag[CondSnap] = 100  # Default to ex-situ if loading fails
                             continue
                     
@@ -6542,7 +6575,7 @@ def get_evolution_accreted_particles_parallel(Params, IDs, dfSample, rterm=2,
                                 print(f'  Adding new subhalo ID: {ID}')
                             df[str(ID)] = np.nan
                             
-                except:
+                except Exception:
                     # Create new dataframe if loading fails
                     if verbose > 0:
                         print(f'  Creating new dataframe for {Param}')
@@ -6570,7 +6603,7 @@ def get_evolution_accreted_particles_parallel(Params, IDs, dfSample, rterm=2,
                             print(f'  Adding new subhalo ID: {ID}')
                         df[str(ID)] = np.nan
                         
-            except:
+            except Exception:
                 # Create new dataframe if loading fails
                 if verbose > 0:
                     print(f'  Creating new dataframe for {Param}')
@@ -6812,7 +6845,7 @@ def Evolution200(
                 posGas = f['PartType0']['Coordinates'][:] / (1+z) / h
                 velGas = f['PartType0']['Velocities'][:] * sqrt_a
                 massGas = f['PartType0']['Masses'][:] * 1e10 / h
-            except:
+            except Exception:
                 posGas = np.zeros((0,3)); velGas = np.zeros((0,3)); massGas = np.zeros(0)
 
             # DM
@@ -6821,7 +6854,7 @@ def Evolution200(
                 velDM = f['PartType1']['Velocities'][:] * sqrt_a
                 mDM = f['Header'].attrs['MassTable'][1] * 1e10 / h
                 massDM = np.full(posDM.shape[0], mDM)
-            except:
+            except Exception:
                 posDM = np.zeros((0,3)); velDM = np.zeros((0,3)); massDM = np.zeros(0)
 
             # STARS
@@ -6829,7 +6862,7 @@ def Evolution200(
                 posStar = f['PartType4']['Coordinates'][:] / (1+z) / h
                 velStar = f['PartType4']['Velocities'][:] * sqrt_a
                 massStar = f['PartType4']['Masses'][:] * 1e10 / h
-            except:
+            except Exception:
                 posStar = np.zeros((0,3)); velStar = np.zeros((0,3)); massStar = np.zeros(0)
 
             # centróide/bulk
@@ -6873,7 +6906,7 @@ def Evolution200(
                 try:
                     idx_cat = int(99 - snap)  # convenção dos seus DFs
                     is_central = (SubfindID_df[sid].values[idx_cat] == GroupFirstSub_df[sid].values[idx_cat])
-                except:
+                except Exception:
                     is_central = False
 
                 if is_central:
@@ -6883,7 +6916,7 @@ def Evolution200(
                         # priorize catálogo se válido
                         if np.isfinite(R200_kpc_cat) and R200_kpc_cat > 0 and np.isfinite(M200_Msun_cat):
                             R200_kpc, M200_Msun = R200_kpc_cat, M200_Msun_cat
-                    except:
+                    except Exception:
                         pass
 
             # V200: velocidade circular em R200

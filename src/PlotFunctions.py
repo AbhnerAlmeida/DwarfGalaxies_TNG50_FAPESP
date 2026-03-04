@@ -1,7 +1,28 @@
 """
-Plot functions
+PlotFunctions
+=============
 
-Author: Abhner P. de Almeida
+Collection of plotting utilities used for the analysis of galaxy
+properties in cosmological simulations and observational datasets.
+
+These functions provide standardized plotting styles, color maps,
+markers, and helper routines for generating figures used in scientific
+analysis and publications.
+
+Main features
+-------------
+- Consistent plotting styles for galaxy categories
+- Standard color/marker/linestyle dictionaries
+- Utilities for multi-panel and evolution plots
+- Helper functions for statistical visualization
+
+Author
+------
+Abhner P. de Almeida
+abhner.almeida AT usp.br
+University of São Paulo (USP)
+
+Created for research on dwarf galaxies and galaxy evolution.
 """
 
 from __future__ import annotations

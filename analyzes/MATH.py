@@ -54,14 +54,28 @@ def boostrap_func(data,func=np.nanmedian,num_boots=1000):
     return np.nan
     
     
-def jackknife(data, func=np.median):
-    n = len(data)
-    t = np.zeros(n)
-    inds = np.arange(n)
+# def jackknife(data, func=np.median):
+#     n = len(data)
+#     t = np.zeros(n)
+#     inds = np.arange(n)
 
-    ## 'jackknifing' by leaving out an observation for  each i                                                                                                                      
+#     ## 'jackknifing' by leaving out an observation for  each i                                                                                                                      
+#     for i in range(n):
+#         t[i] = func(np.delete(data,i))
+
+#     return func(t)
+
+
+def jackknife(data, func=np.median):
+    data = np.asarray(data)
+    n = data.size
+    if n < 2:
+        raise ValueError("Precisa de n >= 2 para jackknife leave-one-out.")
+
+    t = np.empty(n, dtype=float)
     for i in range(n):
-        t[i] = func(np.delete(data,i))
+        sample = np.concatenate((data[:i], data[i+1:]))
+        t[i] = func(sample)
 
     return func(t)
  
