@@ -1,7 +1,6 @@
 """
 Plot functions
 
-
 Author: Abhner P. de Almeida
 """
 
@@ -52,8 +51,6 @@ try:
 except Exception as e: 
     raise ImportError(
         "Missing project-specific modules (ExtractTNG, TNGFunctions, MATH).\n"
-        "This refactored plotting package assumes you are running inside the same project\n"
-        "environment where those modules exist (e.g., your astro analysis repo / notebook env).\n"
         "Original error: " + repr(e)
     ) from e
 
@@ -285,24 +282,12 @@ def PlotMedianEvolution(
 ):
     """
     Cleaner rewrite of my original PlotMedianEvolution.
-
+    -------
     Core improvements:
     - Centralized indexing for ColumnPlot / lineparams paths
-    - Fixed known bugs:
-        * dataPhase -> datasPhase typo
-        * missing datasPhaseTimeAll initialization
-        * ~np.isnan(...) replaced with proper boolean checks
-        * axs[i][1] hard-coded -> axs[i][j]
-        * removed self-comparison in EntryMedian block
-        * CoEvolution interpolation uses len(values) not hard-coded 100
-        * colorbar creation guarded (no NameError if no plotLine created)
     - More explicit structure: validate -> fetch data -> make axes -> plot -> decorate.
-
-    Notes:
-    - This function depends on external helpers:
-      TNG.makedataevolution, TNG.extractDF, ETNG.Softening, colors, lines, labels, labelsequal,
-      titles, texts, scales, linesthicker, capstyles, Legend, savefig, colored_line,
-      format_func_loglog (etc.). They are treated as black boxes.
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
 
     # -----------------------------
@@ -383,7 +368,6 @@ def PlotMedianEvolution(
     # -----------------------------
     # Fetch data (black-box calls)
     # -----------------------------
-    # We normalize into a dictionary of call results so plotting code is simpler.
     data_bundle = {}
 
     if Type not in ("Evolution", "CoEvolution"):
@@ -391,7 +375,6 @@ def PlotMedianEvolution(
 
     if Type == "Evolution":
         if lineparams:
-            # We store per-row (or per-column) lists of arrays, keeping your original structure
             datasAll, dataserrAll = [], []
             datasPhaseAll, datasTimeAll, datasPhaseTimeAll = [], [], []
 
@@ -424,7 +407,7 @@ def PlotMedianEvolution(
                             PhasingPlot=PhasingPlot,
                             SampleName=SampleName, dfName=dfName, Name=Name, nboots=nboots
                         )
-                        datasPhaseAll.append(datasPhase)          # bug fix: datasPhase not dataPhase
+                        datasPhaseAll.append(datasPhase)          
                         datasTimeAll.append(datasTime)
                         datasPhaseTimeAll.append(datasPhaseTime)
                     else:
@@ -626,7 +609,7 @@ def PlotMedianEvolution(
                                 err = np.sqrt((10 ** Yerr / 10 ** Y) ** 2.0 + (err * 10 ** values / (10 ** Y) ** 2.0) ** 2.0)
                                 values = (10 ** values) / (10 ** Y)
 
-                        # NormalizedExSitu branch (kept close to original)
+                        # NormalizedExSitu branch
                         if NormalizedExSitu:
                             Mass4, Mass4err = TNG.makedataevolution(
                                 [names[l]], [column], ["SubhaloMassType4"],
@@ -642,7 +625,7 @@ def PlotMedianEvolution(
                             Frac4 = _safe_array(Frac4[0][0][0])
                             Frac4err = _safe_array(Frac4err[0][0][0])
 
-                            # original intent: normalize to z=0 stellar mass? (kept identical)
+                            #normalize to z=0 stellar mass
                             values = (10 ** values) / (10 ** Mass4[0])
                             err = Frac4err
 
@@ -662,7 +645,7 @@ def PlotMedianEvolution(
                             alpha=alphaShade,
                         )
 
-                        # entry markers (kept behavior)
+                        # entry markers
                         if EntryMedian:
                             dfPop = TNG.extractPopulation(names[l] + column, dfName=dfName)
                             snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
@@ -733,7 +716,7 @@ def PlotMedianEvolution(
                             s=50, alpha=0.9, zorder=2
                         )
 
-                        # pericenter markers (two thresholds)
+                        # pericenter markers
                         if Pericenter:
                             if len(argInfall2) > 0:
                                 idx2 = argInfall2[-1]
@@ -764,11 +747,10 @@ def PlotMedianEvolution(
                 varParam = row if ColumnPlot else column
                 varParam = _as_list(varParam)
 
-                # We loop each parameter in varParam as a different line style
                 for k, paramname in enumerate(varParam):
                     if Type == "Evolution":
                         if ColumnPlot:
-                            # datasAll: [i_row][k_param][j_col] -> list over names
+                            # datasAll: [i_row][k_param][j_col]
                             data = data_bundle["datasAll"][i][k][j]
                             dataerr = data_bundle["dataserrAll"][i][k][j]
                             if PhasingPlot:
@@ -776,7 +758,7 @@ def PlotMedianEvolution(
                                 datatime = data_bundle["datasTimeAll"][i][k][j]
                                 dataphasetime = data_bundle["datasPhaseTimeAll"][i][k][j]
                         else:
-                            # datasAll: [i_row][j_col][k_param] -> list over names
+                            # datasAll: [i_row][j_col][k_param]
                             data = data_bundle["datasAll"][i][j][k]
                             dataerr = data_bundle["dataserrAll"][i][j][k]
                             if PhasingPlot:
@@ -788,7 +770,6 @@ def PlotMedianEvolution(
 
                     else:
                         # CoEvolution with lineparams: x depends on Xparam (m) and y depends on param lines
-                        # Keeping behavior close to original (but simplified): use first Xparam unless you rely on many.
                         xparam = Xparam[i] if i < len(Xparam) else Xparam[0]
                         if ColumnPlot:
                             dataX = data_bundle["datasX"][0][j]
@@ -798,7 +779,7 @@ def PlotMedianEvolution(
                             data = data_bundle["datasY"][k][j]
                         param_for_formatting = paramname
 
-                    # compare-to-normal (original uses [column], [paramname])
+                    # compare-to-normal
                     if CompareToNormal:
                         Y, Yerr = TNG.makedataevolution(
                             ["Normal"], [column], [paramname],
@@ -823,7 +804,7 @@ def PlotMedianEvolution(
                         if Type == "Evolution":
                             err = _safe_array(dataerr[l])
 
-                            # legacy thresholds
+                            # thresholds
                             if "sSFR" in str(paramname):
                                 values[values < -13.5] = np.nan
                             elif "SFR" in str(paramname):
@@ -833,17 +814,13 @@ def PlotMedianEvolution(
                                 err = np.sqrt((Yerr) ** 2.0 + (err) ** 2.0)
                                 values = values - Y
 
-                            # legacy MBC gas truncation
-                            if names[l] == "MBC" and ("Gas" in str(paramname)):
-                                values[xParam > 2.4] = np.nan
-
                             # GasLim cutoff after SnapLostGas (fix boolean)
                             if GasLim and (("Gas" in str(paramname)) or ("SFR" in str(paramname)) or ("Type0" in str(paramname))):
                                 dfPop = TNG.extractPopulation(names[l] + column, dfName=dfName)
                                 med = np.nanmedian(dfPop.SnapLostGas)
                                 if (not np.isnan(med)) and (med > 0):
                                     t_cut = dfTime.Age.loc[dfTime.Snap == int(med)].values[0]
-                                    # choose the first phase value after t_cut (as original intended)
+                                    
                                     mask_after = timeParam > t_cut
                                     if mask_after.any():
                                         PhaseNonGas = phaseParam[mask_after][0]
@@ -923,8 +900,8 @@ def PlotMedianEvolution(
 
             _maybe_set_ylim(ax, i)
 
-            # yscale logic: keep your original dependence on scales(param)
-            # NOTE: param could be not defined for some lineparams paths; we use param_for_formatting fallback.
+            # yscale logic
+            
             if lineparams:
                 p_for_scale = param_for_formatting
             else:
@@ -1143,20 +1120,14 @@ def PlotHist(
 ):
     """
     Plot histograms (or KDE) for a grid of parameters.
-
-    Mental model
-    ------------
+    -------
     - rows x columns define the subplot grid.
     - For each subplot, you plot distributions for each population in `names`.
     - If `density=True`, you draw KDE curves (PDF-like).
     - Otherwise, you draw histograms (optionally normalized via NormCount).
     - You may overlay mean/median vertical lines and optional shading.
-
-    Notes
-    -----
-    External dependencies are treated as black boxes:
-    TNG.makedata, TNG.extractDF, colors/lines/capstyles dicts, labels/titles/texts dicts,
-    Legend(...) and savefig(...), format_func_loglog.
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
 
     np.random.seed(seed)
@@ -1557,18 +1528,13 @@ def PlotScatter(
 ):
     """
     Scatter plot grid for X–Y relations across columns (e.g., samples/snapshots) and multiple Y parameters.
-
-    This refactor preserves all special-case plotting rules. The main goal is to:
+    -------
     - keep the exact behavior,
     - move special rules out of the core loops into dedicated helpers,
     - reduce indexing bugs / duplicated logic,
     - make the function easier to maintain.
-
-    External dependencies assumed (same as your original code):
-    - TNG.makedata, TNG.extractDF, savefig, Legend
-    - dictionaries: labels, labelsequal, texts, titles, colors, edgecolors, markers, lines, scales, linesthicker, msize
-    - format_func_loglog
-    - MATH.split_quantiles
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
 
    
@@ -1696,8 +1662,6 @@ def PlotScatter(
             
     
         # --- Smaller tick label size + custom ticks for a specific ParamX/Y combo ---
-        # NOTE: in your original code, this depends on current Y param name (here `yparam`)
-        # and also checks `ylimmin` list.
         if ("StarFrac" in ParamX) and ("GasFrac" in yparam) and (ylimmin != [0.001]):
             ax.tick_params(axis="y", labelsize=0.88 * fontlabel)
             ax.tick_params(axis="x", labelsize=0.88 * fontlabel)
@@ -1710,13 +1674,9 @@ def PlotScatter(
     def _apply_special_background_rules(ax, ParamX, firstY, linewidth, fontlabel):
         """
         Place ALL your special-case quadrant fills / guide lines / custom ticks here.
-        Preserve the logic exactly by copy-pasting your original if/elif blocks.
-
-        Currently includes only the subset shown earlier. You should copy the remaining cases here.
         """
         # --- Special rules (subset copied from your original) ---
 
-        
         if (ParamX == "MassIn_Infall_to_GasLost") and (ParamsY[0] == "MassAboveAfter_Infall_to_GasLost"):
             x = np.linspace(0, 1)
             y = -x
@@ -1726,7 +1686,6 @@ def PlotScatter(
             ax.axvline(0,color = 'black',linestyle='dashed',lw=2)
             ax.axhline(0,color = 'black',linestyle='dashed',lw=2)
             
-            #ax.fill_between([-0.2, roc_t],-0.2,roc_v,alpha=0.3, color='#1F98D0')  # blue
             ax.fill_between([0, 500], -500, 0, alpha=0.2, color='tab:green')  # yellow
             ax.fill_between([-500, 0], 0, 500, alpha=0.2, color='tab:red')  # orange
             ax.fill_between([0, 500], 0, 500, alpha=0.2, color='tab:blue')  # red
@@ -1753,7 +1712,6 @@ def PlotScatter(
            axs[i][j].plot( x, x, ls='--', color='tab:blue', linewidth=linewidth)
         
            xfitline  = np.linspace(-13 ,-7, 100)
-           #axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth)
            axs[i][j].fill_between(xfitline, -12, xfitline, alpha=0.2, color='tab:red')  # orange
            axs[i][j].text(-10,-10.55, "Inner $\overline{\mathrm{sSFR}}$ \n decrease", fontsize = 0.99*fontlabel)
            axs[i][j].fill_between(xfitline, xfitline,-8, alpha=0.2, color='tab:blue')  # orange
@@ -1787,8 +1745,6 @@ def PlotScatter(
             x = np.linspace(0, 1)
             ax.plot( x, x, ls='--', color='tab:blue', linewidth=linewidth)
 
-        # --- Continue copy-pasting ALL other special cases here ---
-
         if ParamX == "AgeBorn":
             x = np.arange(14)
             ax.plot(x, x, color="black", linestyle="dashed", lw=2)
@@ -1796,15 +1752,6 @@ def PlotScatter(
     def _scatter_one(ax, x, y, name, color_values=None, marker_flags=None):
         """
         Scatter a single group (one 'name') in a single panel.
-    
-        Preserves your 3 modes:
-        - MarkerSizes (marker_flags) -> multiple sizes by class
-        - COLORBAR (color_values) -> per-point color + special norms
-        - Normal -> fixed color
-    
-        Returns:
-            sc_local: PathCollection or None
-            norm_local: matplotlib Normalize (or None)
         """
         sc_local = None
         norm_local = None
@@ -1840,7 +1787,6 @@ def PlotScatter(
     
         # 2) COLORBAR mode
         if color_values is not None:
-            # Prefer: delegate to your “special rules” dispatcher
             sc_local, norm_local = _scatter_with_colorbar(
                 ax=ax,
                 x=x, y=y,
@@ -1877,12 +1823,6 @@ def PlotScatter(
     def _add_colorbar(fig, axs, sc, norm=None):
         """
         Add a colorbar for the scatter plot.
-    
-        Parameters
-        ----------
-        sc : PathCollection or ScalarMappable (the return of ax.scatter), OR accidentally a tuple (sc, norm)
-        norm : matplotlib.colors.Normalize or None
-            If provided, we build a ScalarMappable from (norm, cmap) to guarantee a valid mappable.
         """
         if sc is None and norm is None:
             return None
@@ -1916,11 +1856,10 @@ def PlotScatter(
         else:
             if COLORBAR[0] == 'sSFRRatioPericenter':
                 cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.25, 0.5, 0.75, 1,  2], pad=0.02, aspect=(ratioColorbar or 50))
-                #cb.ax.set_ylim(0.009, 0.07)
                 cb.ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1', '2'])
             elif COLORBAR[0] == 'logStarZ_99':
                 cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.1, 0.2, 0.3, 0.7], pad=0.02, aspect=(ratioColorbar or 50))
-                #cb.ax.set_ylim(0.009, 0.07)
+
                 cb.ax.set_yticklabels(['0', '0.1', '0.2', '0.3', '0.7'])
                 
             else:
@@ -1939,7 +1878,6 @@ def PlotScatter(
 
     panel_cols_for_data, dataX, dataY, dataColor, dataMarker = _load_data(names, columns, ParamsX, ParamsY)
 
-    # Match original behavior: if multiple snaps, the panel column labels are "Snap"
     if len(snap) > 1:
         panel_columns = np.full(len(snap), "Snap")
     else:
@@ -2003,8 +1941,7 @@ def PlotScatter(
                         x_plot[(~np.isnan(x_plot)) & (~np.isinf(x_plot))],
                         y_plot[(~np.isnan(x_plot)) & (~np.isinf(x_plot))],
                     )
-                    # Keep prints if you want (disabled by default)
-                    # print("Name:", name, "corr:", corr, "p:", pval)
+                    print("Name:", name, "corr:", corr, "p:", pval)
 
                 # Scatter
                 sc_local = _scatter_one(ax, x_plot, y_plot, name, color_values=cvals, marker_flags=mflags)
@@ -2054,7 +1991,7 @@ def PlotScatter(
                     & (~np.isnan(YAllSMT)) & (~np.isinf(YAllSMT))
                 )
                 corr, pval = spearmanr(XAllSMT[cond], YAllSMT[cond])
-                # print("Panel Spearman corr:", corr, "p:", pval)
+                print("Panel Spearman corr:", corr, "p:", pval)
 
             # Equal line if requested
             if EqualLine and (EqualLineMin is not None) and (EqualLineMax is not None):
@@ -2178,52 +2115,8 @@ def PlotID(
 ):
     """
     Plot the evolution or co-evolution for selected subhalo IDs.
-
-    Parameters
-    ----------
-    columns, rows : str or list[str]
-        Define the grid. When ColumnPlot=True:
-          - "rows" are the y-parameters
-          - "columns" are the samples/labels (or vice-versa depending on your TNG.makeDF usage)
-        When ColumnPlot=False the mapping swaps (kept to preserve your behavior).
-
-    IDs : list[list[int]] or list[np.ndarray]
-        A list of ID lists. Each grid column/row chooses which list to use:
-          - ColumnPlot=True  -> argIDs = i  (row index)
-          - ColumnPlot=False -> argIDs = j  (column index)
-
-    Type : {"Evolution","CoEvolution"}
-        Evolution uses time on x-axis (with optional top z-axis).
-        CoEvolution uses Xparam per panel/row/col.
-
-    Xparam : str or list[str]
-        For Evolution, Xparam[i] may be "tsincebirth" in your legacy logic.
-        For CoEvolution, Xparam is the x-variable name(s).
-
-    dataMarker : None or str
-        If not None, scatters markers at special points.
-        If contains substring "Merger", it uses:
-          - NumMajorMergersTotal
-          - NumMinorMergersTotal
-          - NumMergersTotal
-        and marks major/minor/other events as in your original.
-
-    dataLine : None or str
-        If not None, uses this series as a filter to plot a thicker line
-        only where dataLine is finite.
-
-    Pericenter : bool
-        If True, extracts r_over_R_Crit200 and marks local minima in that series
-        with "X" markers on the evolution curve.
-
-    LookBackTime : bool
-        If True, uses your fixed lookback time tick mapping.
-
-    Notes
-    -----
-    This function intentionally preserves your domain-specific behaviors.
-    It does not attempt to redesign your plotting conventions, only to
-    make the implementation safer and easier to maintain.
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
 
     # -----------------------------
@@ -2252,12 +2145,6 @@ def PlotID(
         return np.asarray(s, dtype=float).ravel()
 
     def _get_df_for_panel(row_param, col_param, argIDs, i, j):
-        """
-        Preserve original logic:
-        - ColumnPlot=True: makeDF(row, column)
-        - ColumnPlot=False: makeDF(column, row)
-        plus X for co-evolution.
-        """
         if ColumnPlot:
             dataY = TNG.makeDF(
                 row_param,
@@ -2346,13 +2233,6 @@ def PlotID(
         return datamarkervalues, None, None
 
     def _compute_merger_deltas(minor_tot, major_tot, all_tot):
-        """
-        Reproduce your delta-per-snapshot logic.
-
-        Inputs are cumulative totals along snapshots.
-        Output: (minor_delta, major_delta, other_delta) arrays, forward in time.
-        """
-        # Your original flips to do diff from early->late; keep same
         minor = np.flip(minor_tot)
         major = np.flip(major_tot)
         allm = np.flip(all_tot)
@@ -2388,7 +2268,6 @@ def PlotID(
         return np.flip(minor_delta), np.flip(major_delta), np.flip(other_delta)
 
     def _add_top_z_axis(ax, row_param):
-        """Add your z axis mapping on the top for Evolution (except tsincebirth)."""
         lim = ax.get_xlim()
         ax2 = ax.twiny()
         ax2.grid(False)
@@ -2522,7 +2401,6 @@ def PlotID(
     np.random.seed(seed)
 
     # Load time table
-    dfTime = pd.read_csv(os.path.join(os.getenv("HOME"), "TNG_Analyzes/SubhaloHistory/SNAPS_TIME.csv"))
     time = np.asarray(dfTime.Age.values, dtype=float)
 
     snapsTime = np.array([88, 81, 64, 51, 37, 24], dtype=int)
@@ -2624,7 +2502,6 @@ def PlotID(
                 values = _pad_to_length(values_raw, len(time))
 
                 if Type == "Evolution":
-                    # preserve your special handling
                     if row_param == "r_over_R_Crit200_WithoutCorrection":
                         values[values == 0] = np.nan
 
@@ -2675,7 +2552,6 @@ def PlotID(
                                 all_tot = _pad_to_length(_safe_series(datamarkerTotvalues, IDvalue), len(time))
                                 minor_d, major_d, other_d = _compute_merger_deltas(minor_tot, major_tot, all_tot)
 
-                                # preserve your sizes/shapes
                                 ax.scatter(time[major_d > 0], values[major_d > 0], color=colors(str(l)),
                                            lw=1.0, marker="o", edgecolors="black", s=250, alpha=0.7)
                                 ax.scatter(time[minor_d > 0], values[minor_d > 0], color=colors(str(l)),
@@ -2683,7 +2559,6 @@ def PlotID(
                                 ax.scatter(time[other_d > 0], values[other_d > 0], color=colors(str(l)),
                                            lw=1.0, marker="s", edgecolors="black", s=100, alpha=0.7)
                             else:
-                                # non-merger marker mode: interpret markervalues_raw > 0
                                 ax.scatter(time[markervalues_raw > 0], values[markervalues_raw > 0],
                                            color=colors(str(l)),
                                            lw=1.0, marker="o", edgecolors="black", s=130, alpha=0.5)
@@ -2802,23 +2677,8 @@ def PlotIDsAllTogether(
 ):
     """
     Plot the evolution (or phase evolution) of multiple IDs together, grouped by `Names`.
-
-    Legacy semantics preserved:
-    - If IDsNotNames is False:
-        `Names` are population labels. IDs are fetched from:
-            dfPopulation = TNG.extractPopulation(Name, dfName=dfName, Name=NameKey)
-            IDs = dfPopulation["SubfindID_99"].values
-    - If IDsNotNames is True:
-        each entry in `Names` is treated as an iterable of IDs directly, but we still call
-        extractPopulation(Name, ...) to preserve any metadata used by PhasePlot.
-
-    External dependencies expected (same as your original environment):
-    - numpy as np, pandas as pd, matplotlib.pyplot as plt
-    - scipy.interpolate.interp1d
-    - matplotlib.ticker.FixedLocator, FixedFormatter, FuncFormatter
-    - modules/objects: TNG, ETNG, savefig
-    - dict-like: labels, labelsequal, titles, scales, colors
-    - function: format_func_loglog
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
     import os
     import numpy as np
@@ -2898,9 +2758,6 @@ def PlotIDsAllTogether(
     # -----------------------------
     # Common phase grid (if PhasePlot)
     # -----------------------------
-    # Preserve the spirit of your original grid:
-    # - coarse ticks at half-step
-    # - plus a dense sampling
     if PhasePlot:
         x_coarse = np.arange(-1.0, 9.0, 1.0)
         x_half = x_coarse + 0.5
@@ -2928,11 +2785,9 @@ def PlotIDsAllTogether(
             # Determine IDs
             if not IDsNotNames:
                 if dfPopulation is None:
-                    # If we cannot extract population, skip safely
                     continue
                 IDs = dfPopulation["SubfindID_99"].values
             else:
-                # Name is treated as IDs (original behavior)
                 IDs = Name
 
             # Ensure iterable IDs (and avoid empty)
@@ -3233,8 +3088,7 @@ def PlotIDsAllTogether(
             # y-label (left column only)
             if j == 0:
                 try:
-                    # Your original used len(row)>1 which is always True for normal strings.
-                    # Preserve intent: if you have a mapping in labelsequal use it; else fallback to labels.
+                    
                     axs[i][j].set_ylabel(labelsequal.get(row, labels.get(row, row)), fontsize=fontlabel)
                 except Exception:
                     pass
@@ -3391,24 +3245,8 @@ def PlotProfile(
 ):
     """
     Plot radial profiles for multiple samples and snapshots.
-
-    Parameters
-    ----------
-    IDs : sequence
-        List over samples. Each element should be an iterable of SubfindIDs
-        (or a list/array of IDs). In the original code you iterate: for idValue in ID: ...
-        so each IDs[l] must itself be iterable of IDs.
-    names : sequence[str]
-        Names for each sample (same length as IDs).
-    columns : sequence
-        Snapshots to plot (ints). These define the columns of the grid.
-    rows : sequence[str]
-        Profile quantities to plot (e.g. 'Mstellar', 'DensityStar', 'sSFR', ...).
-    PartTypes : sequence[str]
-        Particle type for each row. Must have same length as rows.
-        Expected: 'PartType4', 'PartType0'/'gas', 'PartType1'/'DM', etc.
-
-    Other parameters preserve original behavior.
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
     """
 
     # -----------------------
@@ -3483,9 +3321,6 @@ def PlotProfile(
         df.to_csv(path, index=False)
 
     def _compute_rmin_rmax(ptype: str, rads_linear: np.ndarray):
-        """
-        Your logic uses median(Rads) where Rads are 10**HalfRad (HalfRad seems log10 radius).
-        """
         med = _safe_nanmedian(rads_linear)
         if not np.isfinite(med) or med <= 0:
             # fallback, avoids zeros breaking geomspace
@@ -3719,7 +3554,6 @@ def PlotProfile(
                 rad = ymedian = yerr = None
 
                 # Map special row names to cached directories
-                # (preserve your behavior but make it explicit)
                 special_map = {
                     "sSFR": None,
                     "GFM_Metallicity_Zodot": ("GFM_Metallicity", True),
@@ -3777,11 +3611,10 @@ def PlotProfile(
                         continue
                     radSFR, ySFR, eSFR = out_sfr
 
-                    # To preserve original, force PartType4 for Mstellar cache load
                     cache_ms = _profile_cache_path(base_path, SIMTNG, Condition, "Mstellar", "PartType4", snap, sample_name)
                     out_ms_cached = _read_cached_profile(cache_ms)
                     if out_ms_cached is None:
-                        # Try compute it directly with PartType4 to match your original logic
+                        # Try compute it directly with PartType4
                         radM, yM, eM = TNG.make_profile(
                             ID_group, snap, "Mstellar", "PartType4",
                             rmin=rmin, rmax=rmax, nbins=nbins, nboot=nboots,
@@ -3808,7 +3641,7 @@ def PlotProfile(
                     ymedian = ymedian / 0.0127
                     yerr = yerr / 0.0127
 
-                # Gradient of sSFR (as in your code)
+                # Gradient of sSFR
                 elif row == "GradsSFR":
                     out_sfr = _load_or_make("SFR")
                     if out_sfr is None:
@@ -3870,7 +3703,7 @@ def PlotProfile(
                 # Filter invalid values
                 rad, ymedian, yerr = _filter_valid_xy(rad, ymedian, yerr)
 
-                # Cumulative and normalization (preserve original conditions)
+                # Cumulative and normalization
                 if cumulative and row in ["Mstellar", "Mgas"]:
                     ymedian = np.cumsum(ymedian)
                     if ymedian.size == 0:
@@ -3881,7 +3714,7 @@ def PlotProfile(
                             yerr = yerr / np.nanmax(ymedian)
                             ymedian = ymedian / np.nanmax(ymedian)
 
-                # Gas existence check (your SnapLostGas logic)
+                # Gas existence check
                 if ptype == "PartType0":
                     try:
                         dfS = TNG.extractDF(dfName)
