@@ -3880,3 +3880,836 @@ def PlotProfile(
 
     savefig(savepath, savefigname, TRANSPARENT)
     return
+
+
+
+def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = False, 
+                   PhasingPlot = False, ShowPop = False, ShowPopName = 'Normal', SnapTransition = False, 
+                   SnapTransitionName = '',
+                   title=False, xlabelintext=False, lineparams=False,  QuantileError=True, 
+           alphaShade=0.3,  linewidth=0.5, fontlabel=24, nboots=100,  ColumnPlot=False, limaxis=False, 
+           columnspacing = 0.5, handlelength = 2, handletextpad = 0.4, labelspacing = 0.3, LookBackTime = False, Pericenter = False, postext = ['best'],
+           ylimmax = None, ylimmin = None, GridMake = False, CompareToNormal = False,
+           lNum = 6, cNum = 6, InfallTime = False, NoGas = False, SmallerScale = False,
+           Type='Evolution', Xparam='Time', savepath='fig/PlotIDColumns', savefigname='fig', dfName='Sample', SampleName='Samples', legend=False, LegendNames='None',  loc='best',
+           bins=10, seed=16010504, TRANSPARENT = False, Softening = False, MaxSizeType = False):
+    
+    
+    '''
+    Plot teh evolution for random sample
+    Parameters
+    ----------
+    columns : specific set in the sample / or different param to plot in each column. array with str
+    rows : specific set in the sample / or different param to plot in each row. array with str
+    IDs: IDs for selected subhalos. 
+    The rest is the same as the previous functions
+    Returns
+    -------
+    Requested Evolution or Co-Evolution plot
+    -------
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
+    '''
+
+    np.random.seed(seed)
+
+    dfTime = pd.read_csv(os.getenv("HOME")+"/TNG_Analyzes/SubhaloHistory/SNAPS_TIME.csv")
+    Sample = TNG.extractPopulation(dfName, dfName = dfName)
+
+    snapsTime = np.array([88, 81, 64, 51, 37, 24])
+    # Verify NameParameters
+    if type(IDs) is not list and type(IDs) is not np.ndarray:
+        IDs = [IDs]
+
+    if type(rows) is not list and type(rows) is not np.ndarray:
+        rows = [rows]
+
+    # Define axes(cNum*len(columns), lNum*len(rows))})
+    plt.rcParams.update({'figure.figsize': (lNum*len(IDs), cNum*len(rows))})
+    fig = plt.figure()
+    gs = fig.add_gridspec(len(rows), len(IDs), hspace=0, wspace=0)
+    axs = gs.subplots(sharex='col', sharey='row')
+    
+    if Pericenter:
+        r_over_R_Crit200 = TNG.extractDF('r_over_R_Crit200')
+
+   
+    # Verify axs shape
+    if type(axs) is not list and type(axs) is not np.ndarray:
+        axs = [axs]
+    if type(axs[0]) is not np.ndarray:
+        axs = np.array([axs])
+        if len(IDs) == 1:
+            axs = axs.T
+
+    time = dfTime.Age.values
+
+    for i, row in enumerate(rows):
+        if type(row) is not list and type(row) is not np.ndarray:
+            row = [row]
+        
+        dfs = []
+        Ys = []
+        Yerrs = []
+        for param in row:
+            dfs.append(TNG.extractDF(param))
+            if CompareToNormal:
+                Y, Yerr = TNG.makedataevolution(['Normal'], [''], [param], SampleName=SampleName, dfName = dfName, nboots=nboots)
+                Yerr = np.array([value for value in Yerr[0][0][0]])
+                Y = np.array([value for value in Y[0][0][0]])
+                Ys.append(Y)
+                Yerrs.append(Yerr)
+                
+       
+            
+        if Type == 'CoEvolution':
+            dfX = TNG.extractDF(Xparam[i]) 
+        
+        if dataLine is not None:
+            datalinevalues = TNG.extractDF(dataLine) 
+
+        if dataMarker is not None:
+            if 'Merger' in dataMarker:
+                datamarkerTotvalues = TNG.extractDF('NumMergersTotal') 
+                dataMarkervalues =TNG.extractDF('NumMajorMergersTotal') 
+                datamarkervalues = TNG.extractDF('NumMinorMergersTotal')               
+            else:
+                datamarkervalues = TNG.extractDF(dataMarker) 
+
+        
+        for j, ID in enumerate(IDs):
+            
+            if j == 0:
+               
+                if i > 0 and ('SubhaloHalfmassRadType0' in rows[i - 1][0] or  'StarMass_In_Rhpkpc' in rows[i - 1][0] ) and 'Mgas_Norm_Max' in row[0]:
+                    None
+                elif 'StarMass_In_Rhpkpc' in rows[i - 1][0] :
+                    None
+                
+                elif legend and LegendNames !='None':
+                        if len(LegendNames) <= i  :
+                            None
+                        else:
+                            custom_lines, label, ncol, mult = Legend(LegendNames[i])
+    
+                            axs[i][j].legend(
+                                   custom_lines, label, ncol=ncol, loc=loc, fontsize=0.88*fontlabel, 
+                                  columnspacing = columnspacing, handlelength = handlelength, handletextpad = handletextpad, labelspacing = labelspacing)
+                            loc = 'best'
+                    
+                else:
+                    
+                    loc = 'best'   
+                    if row == ['SubhaloStellarMass_in_Rhpkpc', 'SubhaloStellarMass_Above_Rhpkpc', 'SubhaloGasMass_in_Rhpkpc', 'SubhaloGasMass_Above_Rhpkpc']:
+                        custom_lines, label, ncol, mult = Legend(['in_Rhpkpc', 'Above_'])
+                    
+                    elif row == ['SubhalosSFRInHalfRad', 'SubhalosSFRwithinHalfandRad']:
+
+                        custom_lines, label, ncol, mult = Legend(['SubhalosSFRInHalfRad', 'SubhalosSFRwithinHalfandRad'])
+                        loc = 'best'
+                    elif len(row) > 1:
+                        namesrow = [namerow for namerow in row]
+                        for index, namerow in enumerate(namesrow):
+                            namesrow[index] = namerow+'IDsColumn'
+                        custom_lines, label, ncol, mult = Legend(namesrow)
+                    
+                    
+                    if legend and not (row == ['r_over_R_Crit200_WithoutCorrection', 'r_over_R_Crit200'] or row == ['sSFR_In_TrueRhpkpc', 'sSFR_Above_TrueRhpkpc'] or row == ['SFR_In_Rhpkpc', 'SFR_Above_Rhpkpc'] or row == ['logStar_GFM_Metallicity_In_Rhpkpc', 'logStar_GFM_Metallicity_Above_Rhpkpc'] or row == ['sSFR_In_Rhpkpc', 'sSFR_Above_Rhpkpc'] ) and len(row) > 1: # or row == ['sSFR_In_Rhpkpc', 'sSFR_Above_Rhpkpc']
+                        if row ==  ['Star_GFM_Metallicity_In_Rhpkpc', 'Star_GFM_Metallicity_Above_Rhpkpc']:
+                            
+                            None
+                        else:
+                            axs[i][j].legend(
+                                   custom_lines, label, ncol=ncol, loc=loc, fontsize=0.88*fontlabel, 
+                                  columnspacing = columnspacing, handlelength = handlelength, handletextpad = handletextpad, labelspacing = labelspacing)
+                            loc = 'best'
+
+            if Softening and 'SubhaloHalfmassRadType4' in row:
+                rSoftening = ETNG.Softening()
+                rSoftening = np.flip(rSoftening)
+                axs[i][j].plot(time[(~np.isinf(rSoftening))], np.log10(rSoftening[(~np.isinf(rSoftening))]), 
+                               color='black', ls='solid', lw=2*linewidth)
+            
+            for l, df in enumerate(dfs):
+                #Y = Ys[l]
+                #Yerr = Yerrs[l]
+                values = np.array([value for value in df[str(ID)].values])
+                if Type == 'Evolution':
+                    if row[l] == 'r_over_R_Crit200_FirstGroup':
+                        values[values == 0] = np.nan
+                        arg = np.argwhere(np.isnan(values)).T[0]
+                        values[arg[0]:] = np.nan
+                    
+                    if 'Type4' in row[l] or 'star' in row[l] and not 'HalfRad' in row[l]:
+                        color = 'blue'
+                        ls = 'solid'
+                    elif 'Type0' in row[l] or ('gas' in row[l] and (not '_in_' in row[l] and not '_Above_' in row[l]) ):
+                        color = 'green'
+                        ls = 'solid'
+                    elif 'Type1' in row[l] or 'DM' in row[l]:
+                        color = 'purple'
+                        ls = 'solid'
+                    elif 'SubhalosSFRInHalfRad' in row[l]:
+                        color = 'darkblue'
+                        ls = 'solid'
+                    elif 'SubhalosSFRwithinHalfandRad' in row[l]:
+                        color = 'darkred'
+                        ls = (0, (10, 8))
+                    elif ('r_over_R_Crit200_FirstGroup' in row[l] ) or ('Group_M_Crit200' in row[l]):
+                        color = 'red'
+                        ls = 'dashed'
+                    elif 'r_over_R_Crit200' in row[l]:
+                        color = 'darkorange'
+                        ls = 'solid'
+                       
+                    elif ('in_Rhpkpc' in row[l] or 'In_TrueRhpkpc' in row[l] or   'In_Rhpkpc' in row[l]) and not ('Inflow'  in row[l] or 'Outflow' in row[l] or 'Rhpkpc_entry'  in row[l]):
+                        color = 'darkblue'
+                        ls = 'solid'
+                    elif ('Above_Rhpkpc' in row[l] or 'Above_TrueRhpkpc' in row[l]) and not ('Inflow'  in row[l] or 'Outflow' in row[l] ):
+                        color = 'tab:blue'
+                        ls =  (0, (10, 6))
+
+                    else:
+                        color = colors.get(row[l], 'black')
+                        ls = lines.get(row[l], 'solid')
+        
+                    if CompareToNormal:
+                        values[~np.isnan(values)] = (values[~np.isnan(values)] - Y[~np.isnan(values)]) / Yerr[~np.isnan(values)]
+        
+                    if PhasingPlot :
+                        xparam = np.arange(-1, 9)
+                        xparam = np.append(xparam, xparam+0.5)
+                        xparam = np.append(xparam, np.linspace(-1, 9, 1000))
+                        xparam = np.unique(xparam)
+                        values = np.flip(values)
+                        dfPopulation = TNG.extractPopulation(dfName, dfName = dfName)
+                        
+                        phases = TNG.PhasingData(ID, dfPopulation)
+                        
+                        if type(phases) != np.ndarray:
+                            continue
+                        phases = phases[(~np.isnan(values)) & (~np.isinf(values))]
+                        values = values[(~np.isnan(values)) & (~np.isinf(values))]
+                        if len(values) == 0:
+                            continue
+                        X_Y_Spline = interp1d(phases, values,kind="linear",fill_value="extrapolate")
+                        values = X_Y_Spline(xparam)
+                        if phases.max() < 8:
+                            values[xparam > phases.max()] = np.nan
+                        else:
+                            values[xparam > 4] = np.nan
+
+                    else:
+                        xparam = time
+
+                    if ShowPop:
+                        Y, Yerr = TNG.makedataevolution([ShowPopName], [''], [row[l]], SampleName=SampleName, dfName = dfName, nboots=nboots)
+                        Yerr = np.array([value for value in Yerr[0][0][0]])
+                        Y = np.array([value for value in Y[0][0][0]])
+                        if ('Gas' in row[l]  or 'Type0' in row[l]):
+                            Y[:int(99 - 83)] = np.nan
+                            Yerr[:int(99 - 83)] = np.nan
+                            print(Y, Yerr)
+                        #if ('Gas' in row[l] or 'SFR' in row[l] or 'Type0' in row[l]):
+                            
+                        #    dfPop = TNG.extractPopulation(ShowPopName, dfName = dfName)
+                        #    if ~np.isnan(np.nanmedian(dfPop.SnapLostGas)) and np.nanmedian(dfPop.SnapLostGas) > 0:
+                        #        Y[xparam > dfTime.Age.loc[dfTime.Snap == int(np.nanmedian(dfPop.SnapLostGas))].values[0]] = np.nan
+                     
+                        
+                        axs[i][j].plot(xparam[~np.isnan(Y)], Y[~np.isnan(
+                            Y)], color=colors.get(ShowPopName, 'black'), ls=ls, 
+                            lw=1.*linesthicker.get(ShowPopName, linewidth), dash_capstyle = capstyles.get(ShowPopName, 'projecting'))
+            
+
+                        axs[i][j].fill_between(
+                            xparam[~np.isnan(Y)], Y[~np.isnan(Y)] - Yerr[~np.isnan(Y)], 
+                            Y[~np.isnan(Y)] + Yerr[~np.isnan(Y)], color=colors.get(ShowPopName+'Error', 'black'), ls=ls, alpha=alphaShade)
+                         
+                    axs[i][j].plot(xparam[~np.isnan(values)], values[~np.isnan(values)], color=color,  ls=ls, lw=linewidth)
+
+                    if Pericenter :#and not row == 'r_over_R_Crit200':
+                        snapFirstPeri = Sample['SnapFirstPeri'].loc[Sample.SubfindID == ID].values[0]
+                        SnapSecondPeri = Sample['SnapSecondPeri'].loc[Sample.SubfindID == ID].values[0]
+                        SnapThirdPeri = Sample['SnapThirdPeri'].loc[Sample.SubfindID == ID].values[0]
+                        SnapFirstApo = Sample['SnapFirstApo'].loc[Sample.SubfindID == ID].values[0]
+                        SnapSecondApo = Sample['SnapSecondApo'].loc[Sample.SubfindID == ID].values[0]
+                        
+                        if ~np.isnan(SnapThirdPeri):
+                            Peris = np.array([99-int(snapFirstPeri), 99-int(SnapSecondPeri), 99-int(SnapThirdPeri)])
+                        elif ~np.isnan(SnapSecondPeri):
+                            Peris = np.array([99-int(snapFirstPeri), 99-int(SnapSecondPeri)])
+                        elif ~np.isnan(snapFirstPeri):
+                            Peris = np.array([99-int(snapFirstPeri)])
+                            
+                        if ~np.isnan(snapFirstPeri):
+                            axs[i][j].scatter(time[Peris], values[Peris],color='red', marker = 'x', s = 30, edgecolor = 'black' )
+                        
+                        if ~np.isnan(SnapSecondApo):
+                            Apos = np.array([99-int(SnapFirstApo), 99-int(SnapSecondApo)])
+                        elif ~np.isnan(SnapFirstApo):
+                            Apos = np.array([99-int(SnapFirstApo)])
+                            
+                        if ~np.isnan(SnapFirstApo):
+                            axs[i][j].scatter(xparam[Apos], values[Apos],color='black', marker = 'x', s = 30, edgecolor = 'black' )
+
+                    if InfallTime:
+                        
+                        infallsnap = Sample.loc[Sample.SubfindID_99 == ID, 'Snap_At_FirstEntry'].values[0]
+                        infallsnap = float(infallsnap)
+                        if ~np.isnan(infallsnap) and infallsnap > 0:
+                            infallsnap = int(99-infallsnap)
+                            axs[i][j].axvline(xparam[infallsnap], color='black', ls = (0, (10, 8)))
+                            
+                    if SnapTransition:
+                        
+                        infallsnap = Sample.loc[Sample.SubfindID_99 == ID, SnapTransitionName].values[0]
+                        if ~np.isnan(infallsnap) and infallsnap > 0:
+                            infallsnap = int(99-infallsnap)
+                            axs[i][j].axvline(xparam[infallsnap], color='red', ls = (0, (10, 8)))
+
+                    if SatelliteTime and 'Group_M_Crit200' in param:
+                        
+                        infallsnap = Sample.loc[Sample.SubfindID_99 == ID, 'SnapBecomeSatellite'].values[0]
+                        if ~np.isnan(infallsnap) and infallsnap > 0:
+                            axs[i][j].scatter(xparam[int(99-infallsnap)], values[int(99-infallsnap)], marker = '*', s = 220, color = 'red')
+
+                    if NoGas:
+                       infallsnap =  Sample.loc[Sample.SubfindID_99 == ID, 'SnapLostGas'].values[0]
+                        
+                       if  ~np.isnan(infallsnap) and infallsnap > 0:
+                            infallsnap = int(99-infallsnap)
+                            axs[i][j].axvspan(xparam[infallsnap], time[0], color='pink', alpha=0.5, lw=0)
+                        
+                    if MaxSizeType :
+                         MaxSize = Sample['MaxSizeType4'].loc[Sample.SubfindID == ID].values[0]
+                         axs[i][j].axhline(MaxSize)
+                         
+                    if dataLine is not None:
+                        linevalues = np.array(
+                            [value for value in datalinevalues[str(ID)].values])
+                        if len(linevalues.shape) > 1:
+                            linevalues = linevalues.T[0]
+                            linevalues = np.array(
+                                [value for value in linevalues])
+                        axs[i][j].plot(xparam[(~np.isinf(linevalues)) & (~np.isnan(linevalues))], values[(~np.isinf(
+                            linevalues)) & (~np.isnan(linevalues))], color=color, ls='solid', lw=2*linewidth)
+
+                    if dataMarker is not None:
+                        markervalues = np.array(
+                            [value for value in datamarkervalues[str(ID)].values])
+                        if len(markervalues.shape) > 1:
+                            markervalues = markervalues.T[0]
+                            markervalues = np.array(
+                                [value for value in markervalues])
+
+                        if 'Merger' in dataMarker:
+                            SnapCorotateMerger = Sample.loc[Sample.SubfindID_99 == ID, 'SnapCorotateMergers'].values[0]
+                            
+                            mergerTot = np.array(
+                                [value for value in datamarkerTotvalues[str(ID)].values])
+                            if len(mergerTot.shape) > 1:
+                                mergerTot = mergerTot.T[0]
+                                mergerTot = np.array(
+                                    [value for value in mergerTot])
+
+                            MarkerTotvalues = np.array(
+                                [value for value in datamarkerTotvalues[str(ID)].values])
+                            if len(MarkerTotvalues.shape) > 1:
+                                MarkerTotvalues = MarkerTotvalues.T[0]
+                                MarkerTotvalues = np.array(
+                                    [value for value in MarkerTotvalues])
+
+                            mergernumber = np.array(
+                                [value for value in datamarkervalues[str(ID)].values])
+                            if len(mergernumber.shape) > 1:
+                                mergernumber = mergernumber.T[0]
+                                mergernumber = np.array(
+                                    [value for value in mergernumber])
+
+                            Mergernumber = np.array(
+                                [value for value in dataMarkervalues[str(ID)].values])
+                            if len(Mergernumber.shape) > 1:
+                                Mergernumber = Mergernumber.T[0]
+                                Mergernumber = np.array(
+                                    [value for value in Mergernumber])
+
+                            Markervalues = np.array(
+                                [value for value in datamarkervalues[str(ID)].values])
+                            if len(Markervalues.shape) > 1:
+                                Markervalues = Markervalues.T[0]
+                                Markervalues = np.array(
+                                    [value for value in Markervalues])
+
+                            mergernumber = np.flip(mergernumber)
+                            Mergernumber = np.flip(Mergernumber)
+                            mergerTot = np.flip(mergerTot)
+
+                            for nmergerindex, nmerger in enumerate(mergernumber):
+
+                                if nmergerindex == 0:
+                                    markervalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        markervalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            markervalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            markervalues[nmergerindex] = int(
+                                                nmerger) - int(mergernumber[nmergerindex - 1])
+
+                            for nmergerindex, nmerger in enumerate(Mergernumber):
+
+                                if nmergerindex == 0:
+                                    Markervalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        Markervalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            Markervalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            Markervalues[nmergerindex] = int(
+                                                nmerger) - int(Mergernumber[nmergerindex - 1])
+
+                            for nmergerindex, nmerger in enumerate(mergerTot):
+
+                                if nmergerindex == 0:
+                                    MarkerTotvalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        MarkerTotvalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            MarkerTotvalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            MarkerTotvalues[nmergerindex] = int(
+                                                nmerger) - int(mergerTot[nmergerindex - 1])
+                            MarkerTotvalues = MarkerTotvalues - Markervalues - markervalues
+                            Markervalues = np.flip(Markervalues)
+                            markervalues = np.flip(markervalues)
+                            MarkerTotvalues = np.flip(MarkerTotvalues)
+
+                        axs[i][j].scatter(xparam[(Markervalues > 0)], values[(Markervalues > 0)], color=colors.get(
+                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=250, alpha=0.7)
+                        axs[i][j].scatter(xparam[(markervalues > 0)], values[(markervalues > 0)], color=colors.get(
+                            str(l), 'black'), lw=1., marker='s',  edgecolors='black', s=100, alpha=0.7)
+                        
+                        if ~np.isnan(SnapCorotateMerger):
+                            axs[i][j].scatter(time[(MarkerTotvalues > 0)], values[(MarkerTotvalues > 0)], 
+                                              color=colors.get(str(l), 'black'), lw=1., marker='*',  edgecolors='black', s=300, alpha=0.7)
+
+                elif Type == 'CoEvolution':
+                    x = dfX[str(ID)].values
+                    
+                    if 'Type4' in row[l] or 'StarMass' in row[l]:
+                        color = 'blue'
+                    elif 'Type0' in row[l] or 'GasMass' in row[l]:
+                        color = 'green'
+                    elif 'Type1' in row[l] or 'DMMass' in row[l]:
+                        color = 'purple'
+                    else:
+                        color = 'black'
+                        
+                    if len(x.shape) > 1:
+                        x = np.array([value for value in x.T[0]])
+                    else:
+                        x = np.array([value for value in x])
+                    colorSnap = np.array(
+                        ['magenta', 'blue', 'cyan', 'lime', 'darkorange', 'red'])
+                    if Xparam[i] != 'tsincebirth':
+                        axs[i][j].scatter(x[99-snapsTime], values[99-snapsTime], color=colorSnap,
+                                          lw=1., marker='d',  edgecolors=color, s=100, alpha=0.9)
+                        axs[i][j].scatter(x[0], values[0], color='black', lw=1.,
+                                          marker='o',  edgecolors=color, s=70, alpha=0.9)
+                    argnotnan = ~np.isnan(values)
+                    axs[i][j].plot(x[argnotnan], values[argnotnan], color=color, ls= 'solid')
+
+                    if dataLine is not None:
+                        linevalues = np.array(
+                            [value for value in datalinevalues[str(ID)].values])
+                        if len(linevalues.shape) > 1:
+                            linevalues = linevalues.T[0]
+                            linevalues = np.array(
+                                [value for value in linevalues])
+                        axs[i][j].plot(x[(~np.isinf(linevalues)) & (~np.isnan(linevalues))], values[(~np.isinf(linevalues)) & (
+                            ~np.isnan(linevalues))], color=color, ls='solid', lw=3.)
+
+                    if dataMarker is not None:
+                        markervalues = np.array(
+                            [value for value in datamarkervalues[str(ID)].values])
+                        if len(markervalues.shape) > 1:
+                            markervalues = markervalues.T[0]
+                            markervalues = np.array(
+                                [value for value in markervalues])
+
+                        if 'Merger' in dataMarker:
+                            mergerTot = np.array(
+                                [value for value in datamarkerTotvalues[str(ID)].values])
+                            if len(mergerTot.shape) > 1:
+                                mergerTot = mergerTot.T[0]
+                                mergerTot = np.array(
+                                    [value for value in mergerTot])
+
+                            MarkerTotvalues = np.array(
+                                [value for value in datamarkerTotvalues[str(ID)].values])
+                            if len(MarkerTotvalues.shape) > 1:
+                                MarkerTotvalues = MarkerTotvalues.T[0]
+                                MarkerTotvalues = np.array(
+                                    [value for value in MarkerTotvalues])
+
+                            mergernumber = np.array(
+                                [value for value in datamarkervalues[str(ID)].values])
+                            if len(mergernumber.shape) > 1:
+                                mergernumber = mergernumber.T[0]
+                                mergernumber = np.array(
+                                    [value for value in mergernumber])
+
+                            Mergernumber = np.array(
+                                [value for value in dataMarkervalues[str(ID)].values])
+                            if len(Mergernumber.shape) > 1:
+                                Mergernumber = Mergernumber.T[0]
+                                Mergernumber = np.array(
+                                    [value for value in Mergernumber])
+
+                            Markervalues = np.array(
+                                [value for value in datamarkervalues[str(ID)].values])
+                            if len(Markervalues.shape) > 1:
+                                Markervalues = Markervalues.T[0]
+                                Markervalues = np.array(
+                                    [value for value in Markervalues])
+
+                            mergernumber = np.flip(mergernumber)
+                            Mergernumber = np.flip(Mergernumber)
+                            mergerTot = np.flip(mergerTot)
+
+                            for nmergerindex, nmerger in enumerate(mergernumber):
+
+                                if nmergerindex == 0:
+                                    markervalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        markervalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            markervalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            markervalues[nmergerindex] = int(
+                                                nmerger) - int(mergernumber[nmergerindex - 1])
+
+                            for nmergerindex, nmerger in enumerate(Mergernumber):
+
+                                if nmergerindex == 0:
+                                    Markervalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        Markervalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            Markervalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            Markervalues[nmergerindex] = int(
+                                                nmerger) - int(Mergernumber[nmergerindex - 1])
+
+                            for nmergerindex, nmerger in enumerate(mergerTot):
+
+                                if nmergerindex == 0:
+                                    MarkerTotvalues[nmergerindex] = 0
+                                    continue
+                                else:
+                                    if np.isnan(nmerger):
+                                        MarkerTotvalues[nmergerindex] = 0
+                                    else:
+                                        if np.isnan(mergernumber[nmergerindex - 1]):
+                                            MarkerTotvalues[nmergerindex] = int(
+                                                nmerger)
+                                        else:
+                                            MarkerTotvalues[nmergerindex] = int(
+                                                nmerger) - int(mergerTot[nmergerindex - 1])
+                            MarkerTotvalues = MarkerTotvalues - Markervalues - markervalues
+                            Markervalues = np.flip(Markervalues)
+                            markervalues = np.flip(markervalues)
+                            MarkerTotvalues = np.flip(MarkerTotvalues)
+
+                        axs[i][j].scatter(x[(Markervalues > 0)], values[(Markervalues > 0)], color=colors.get(
+                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=130, alpha=0.5)
+                        axs[i][j].scatter(x[(markervalues > 0)], values[(markervalues > 0)], color=colors.get(
+                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=110, alpha=0.5)
+                        #axs[i][j].scatter(x[(MarkerTotvalues > 0)], values[(MarkerTotvalues > 0)], color=colors.get(
+                            #str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=15, alpha=0.5)
+
+            # Plot details
+
+            if row[-1] == 'StarMassNormalized':
+                axs[i][j].set_yticks([0.1, 0.2, 0.5, 1])
+                axs[i][j].set_yticklabels(['0.1','0.2', '0.5', '1'])
+                
+            
+
+            if GridMake:
+                axs[i][j].grid(GridMake, color='#9e9e9e',  which="major", linewidth= 0.6,alpha= 0.3 , linestyle=':')
+               
+            axs[i][j].tick_params(axis='y', labelsize=0.99*fontlabel)
+            axs[i][j].tick_params(axis='x', labelsize=0.99*fontlabel)
+	    
+            
+            if ylimmin != None and ylimmax != None:
+                axs[i][j].set_ylim(ylimmin[i], ylimmax[i])
+            if scales.get(row[0]) != None :
+                axs[i][j].set_yscale(scales.get(row[0]))
+            if scales.get(row[0]) == 'log' :
+                axs[i][j].yaxis.set_major_formatter(
+                    FuncFormatter(format_func_loglog))
+                
+            if row[-1] == 'FracType1':
+                axs[i][j].set_yticks([0.2, 0.3, 0.5, 1])
+                axs[i][j].set_yticklabels(['0.2','0.3', '0.5', '1'])
+
+            
+            if j == 0:
+
+                if len(row) > 1:
+                    axs[i][j].set_ylabel(
+                        labelsequal.get(row[0]), fontsize=fontlabel)
+
+                else:
+                    axs[i][j].set_ylabel(labels.get(row[0]), fontsize=fontlabel)
+
+            if j == len(IDs) - 1:
+                if xlabelintext and not limaxis and len(rows) > 1:
+                    Afont = {'color':  'black',
+                             'size': fontlabel,
+                             }
+                    anchored_text = AnchoredText(
+                        texts.get(row), loc='upper right', prop=Afont)
+                    axs[i][j].add_artist(anchored_text)
+
+            if xlabelintext and limaxis and len(rows) > 1:
+                Afont = {'color':  'black',
+                         'size': fontlabel,
+                         }
+                anchored_text = AnchoredText(
+                    texts[row], loc='upper left', prop=Afont)
+                axs[i][j].add_artist(anchored_text)
+                
+            if j == 0:
+                
+                
+                if title != None and ColumnPlot:
+                    Afont = {'color':  'black',
+                             'size': fontlabel,
+                             }
+                    anchored_text = AnchoredText(
+                        titles.get(
+                            title[i], title[i]), loc=postext[i], prop=Afont)
+                    axs[i][j].add_artist(anchored_text)
+
+
+            if i == 0:
+
+                if title and not ColumnPlot:
+                    axs[i][j].set_title(titles.get(
+                        title[j], title[j]), fontsize=1*fontlabel)
+                
+
+                if Type == 'Evolution' and not PhasingPlot:
+
+                    axs[i][j].tick_params(bottom=True, top=False)
+                    lim = axs[i][j].get_xlim()
+                    ax2label = axs[i][j].twiny() #secondary_xaxis('top', which='major')
+                    ax2label.grid(False)
+                    ax2label.set_xlim(lim)
+
+                    if row == 'rToRNearYoung' or savefigname == 'Young':
+                        zticks = np.array([0., 0.2])
+                        zlabels = np.array(
+                            ['0', '0.2'])
+                        zticks_Age = np.array(
+                            [13.803, 11.323])
+                    elif not PhasingPlot:
+                        zticks = np.array([0., 0.2, 0.5, 1., 2., 5., 20.])
+                        if SmallerScale:
+
+                            if j == 0:
+                                zlabels = np.array(
+                                    ['0', '0.2', '0.5', '1', '2', '5', '20'])
+                            if j != 0:
+                                zlabels = np.array(
+                                    ['0', '0.2', '0.5', '1', '2', '5', ''])
+                        else:
+                            zlabels = np.array(
+                                ['0', '0.2', '0.5', '1', '2', '5', '20'])
+                        zticks_Age = np.array(
+                            [13.803, 11.323, 8.587, 5.878, 3.285, 1.2, 0])
+
+
+                    zticks = zticks.tolist()
+                    zticks_Age = zticks_Age.tolist()
+
+                    x_locator = FixedLocator(zticks_Age)
+                    x_formatter = FixedFormatter(zlabels)
+                    ax2label.xaxis.set_major_locator(x_locator)
+                    ax2label.xaxis.set_major_formatter(x_formatter)
+                    ax2label.set_xlabel(r"$z$", fontsize=fontlabel)
+                    ax2label.tick_params(labelsize=0.85*fontlabel)
+                    ax2label.tick_params(axis='x',  which='minor', top=False)
+
+
+            if i == len(rows) - 1:
+                
+                if Type == 'Evolution':
+                    
+                    
+                    if row == 'rToRNearYoung' or savefigname == 'Young':
+                        axs[i][j].set_xlabel(r'$t \, \,  [\mathrm{Gyr}]$', fontsize=fontlabel)
+                        axs[i][j].set_xticks([10, 12, 14])
+                        axs[i][j].set_xticklabels(
+                            ['10', '12', '14'])
+                    elif not PhasingPlot:
+                        if LookBackTime:
+                            axs[i][j].set_xticks([0.  ,  1.97185714,  3.94371429,  5.91557143,  7.88742857, 9.85928571, 11.83114286, 13.803  ])
+                            if SmallerScale:
+                                fig.supxlabel(r'$\mathrm{Lookback \; Time} \, \, [\mathrm{Gyr}]$', fontsize=fontlabel, y = 0.07)
+
+                                if j == 0:
+                                    axs[i][j].set_xticklabels(
+                                    ['14', '12', '10', '8', '6', '4', '2', '0'])
+                                if j != 0:
+                                    axs[i][j].set_xticklabels(
+                                    ['', '12', '10', '8', '6', '4', '2', '0'])
+                            else:
+                                axs[i][j].set_xlabel(r'$\mathrm{Lookback \; Time} \, \, [\mathrm{Gyr}]$', fontsize=fontlabel)
+
+                                axs[i][j].set_xticklabels(
+                                    ['14', '12', '10', '8', '6', '4', '2', '0'])
+                        else:
+                            axs[i][j].set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
+
+                            axs[i][j].set_xlabel(r'$t \, \, [\mathrm{Gyr}]$', fontsize=fontlabel)
+        
+                            axs[i][j].set_xticklabels(
+                                ['0', '2', '4', '6', '8', '10', '12', '14'])
+
+                    elif PhasingPlot:
+                        axs[i][j].set_xlabel(r'$\phi_\mathrm{Orbital}$', fontsize=fontlabel)
+                        axs[i][j].set_xticks([-1, -0.5, 0, 1, 2, 3, 4, 5] )
+                        axs[i][j].set_xticklabels(['', 'E', '0', '1', '2', '3', '4', '5'])
+                        axs[i][j].set_xlim(-1, 5.5)
+                        
+                elif Type == 'CoEvolution':
+                    axs[i][j].set_xscale(scales.get(Xparam[i], 'linear'))
+                    if scales.get(Xparam[i]) == 'log':
+                        axs[i][j].xaxis.set_major_formatter(
+                            FuncFormatter(format_func_loglog))
+                    axs[i][j].set_xlabel(labels.get(
+                        Xparam[i], 'None'), fontsize=fontlabel)
+
+    savefig(savepath, savefigname, TRANSPARENT)
+
+    return
+
+
+
+def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample, PartType = 'PartType4', velPlot= False):
+    yIDs  = np.array([])
+    massIDs = np.array([])
+    xIDs = np.array([])
+    notIndex = np.array([])
+    
+    for l, ID in enumerate(IDs):
+        if ID == 603556 or ID == 602133:
+            continue
+        snap = Snaps[l]
+        if np.isnan(snap):
+            continue
+        snap = int(snap)
+        #print('snap: ', snap)
+        yrad, rad, mass = TNG.MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = PartType, velPlot= velPlot)
+        
+        if len(yrad) == 1 or (ID == 603556 or ID == 602133):
+            notIndex = np.append(notIndex, l)
+            continue
+        if l == 0 or len(yIDs ) == 0:
+            yIDs  = np.append(yIDs , yrad)
+            xIDs = np.append(xIDs, rad)
+            massIDs = np.append(massIDs, mass)
+    
+        else:
+            yIDs  = np.vstack((yIDs , yrad))
+            massIDs = np.vstack((massIDs, mass))
+            xIDs = np.vstack((xIDs, rad))
+           
+    
+        Rvalues = xIDs.T
+        Values = yIDs .T
+        Masses = massIDs.T
+    
+    x = np.array([])
+    y = np.array([])
+    yerr = np.array([])
+    mass = np.array([])
+
+    if len(Values) > 0:
+        if len(Values.shape) > 1:
+            for k, value in enumerate(Values):
+                x = np.append(x, np.nanmedian(Rvalues[k]))
+                y = np.append(y, np.nanmedian(value))
+                yerr = np.append(yerr, MATH.boostrap_func(value, func=np.nanmedian, num_boots=1000))
+                mass = np.append(mass, np.nanmedian(Masses[k]))
+        else:
+            x = Rvalues
+            y = Values
+            yerr = np.zeros(len(y))
+            mass = Masses
+    
+    else:
+        x = np.nan
+        y = np.nan
+        yerr = np.nan
+        mass = np.nan
+            
+    return x, y,yerr, mass, xIDs, yIDs, massIDs, notIndex
+
+def MakeLines(j, ax,  yIDs, xIDs, IDs, notIndex, colors):
+    k = 0
+    for l, ID in enumerate(IDs):
+        if l in notIndex:
+            continue
+        
+        yvalues = yIDs[k]
+        xvalues = xIDs[k]
+        alpha = 0.3
+        if j == 1 or j == 2:
+            xvalues = xvalues[yvalues > 0] 
+            yvalues = yvalues[yvalues > 0]*xvalues**2.
+            if j == 2:
+                try:
+                    if yvalues[xvalues == 1.01871524] > 5e7:
+                        alpha = 0
+                except:
+                    None
+            ax.plot(xvalues, yvalues , 
+                                 lw = 0.82,  alpha = alpha,  color = colors[k])
+        else:
+            ax.plot(xvalues , yvalues, 
+                                     lw = 0.82,  alpha = alpha,  color = colors[k])
+
+        k = k+ 1
+        
+        #y_p2 = np.percentile(yIDs, 25, axis=0)     # 2.5th percentile
+    #y_p97 = np.percentile(yIDs, 75, axis=0)   # 97.5th percentile
+    #if j == 0:
+    #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)], y_p2[~np.isnan(y_p2)], y_p97[~np.isnan(y_p97)], color=ColorFill, alpha=0.2)  # 2σ equivalent
+    #else:
+    #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)] , y_p2[~np.isnan(y_p2)]  * xvalues[~np.isnan(y_p2)]**2., y_p97[~np.isnan(y_p97)]  * xvalues[~np.isnan(y_p97)]**2., color=ColorFill, alpha=0.2)  # 2σ equivalent
+

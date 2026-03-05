@@ -370,6 +370,10 @@ BASE_scales = {
     'MDM_Norm_Max_99': 'log',
     'Mstar_Norm_Max_99': 'log',
     
+    'Mgas_Norm_Max':   'log',
+    'MDM_Norm_Max':   'log',
+    'Mstar_Norm_Max':  'log',
+    
     'GasFrac_99': 'log',
     'StarFrac_99': 'log',
     'DMFrac_99': 'log',
@@ -607,6 +611,10 @@ labelsequal = {
     'MDM_Norm_Max_99': r'$M_{z = 0}/ M_\mathrm{max}$',
     'Mstar_Norm_Max_99': r'$M_{z = 0}/ M_\mathrm{max}$',
     
+    'Mgas_Norm_Max':r'$M/ M_\mathrm{max}$',
+    'MDM_Norm_Max': r'$M/ M_\mathrm{max}$',
+    'Mstar_Norm_Max': r'$M/ M_\mathrm{max}$',
+    
     'GasMass_In_Rhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
     'GasMass_Above_Rhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
     'GasMass_In_TrueRhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
@@ -689,6 +697,10 @@ labels = {
     'Mgas_Norm_Max_99':r'$(M_{z = 0}/ M_\mathrm{max})_\mathrm{gas}$',
     'MDM_Norm_Max_99': r'$(M_{z = 0}/ M_\mathrm{max})_\mathrm{DM}$',
     'Mstar_Norm_Max_99': r'$(M_{z = 0}/ M_\mathrm{max})_\star$',
+    
+    'Mgas_Norm_Max':r'$(M/M_\mathrm{max})_\mathrm{gas}$',
+    'MDM_Norm_Max': r'$(M/ M_\mathrm{max})_\mathrm{DM}$',
+    'Mstar_Norm_Max': r'$(M/ M_\mathrm{max})_\star$',
     
     'GasFrac_99': r'$(M_\mathrm{gas}/ M)_{z = 0}$',
     'StarFrac_99': r'$(M_\star/ M)_{z = 0}$',
