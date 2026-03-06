@@ -80,6 +80,8 @@ except Exception as e:
 Omegam0 = 0.3089
 h = 0.6774
 
+plt.style.use("abhner.mplstyle")
+
 #Paths
 SaveSubhaloPath = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/'
 SIMTNG = 'TNG50'

@@ -241,7 +241,7 @@ def DownloadSubhalo(ID, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' , 
         cache_dir = os.path.join(PATH, SIM, "Subhalos")
         _ensure_dir(cache_dir)
 
-        cached = cache_dir / f"{int(ID)}.hdf5"
+        cached = cache_dir + '/' + f"{int(ID)}.hdf5"
         try:
             return h5py.File(str(cached), "r")
         except Exception:
@@ -255,7 +255,7 @@ def DownloadSubhalo(ID, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory' , 
             pass
 
         etng_out = os.path.join(os.getenv("HOME"), "SIMS", "TNG", f"{SIM}{NSim}", "output")
-        src = etng_out / f"sublink_mpb_{int(ID)}.hdf5"
+        src = etng_out + '/' +f"sublink_mpb_{int(ID)}.hdf5"
         shutil.copyfile(src, cached)
 
         return h5py.File(str(cached), "r")
@@ -438,6 +438,20 @@ def ImportField(param, ID, SIM = 'TNG50', NSim = '-1'):
                                 
                         elif 'Metallicity' in param:
                             data = np.log10(file[param][:] /0.0127)   # Z0
+                            
+                        elif 'GasMetal' in param:
+                            print(param)
+                            if 'H' in param[-1]: 
+                                data = np.log10(file['SubhaloGasMetalFractions'][:, 0] * file['SubhaloMassType'][:, 0] * 1e10 / h)   # H0
+                            elif 'He' == param[-2:]: 
+                                data = np.log10(file['SubhaloGasMetalFractions'][:, 1] * file['SubhaloMassType'][:, 0] * 1e10 / h)   # H0
+                            
+                            elif 'O' == param[-1:]: 
+                                data = np.log10(file['SubhaloGasMetalFractions'][:, 4] * file['SubhaloMassType'][:, 0] * 1e10 / h)   # H0
+                            
+                            else: 
+                                data = np.log10(np.nansum(file['SubhaloGasMetalFractions'][:, 2:] )* file['SubhaloMassType'][:, 0] * 1e10 / h )   # H0
+                            
                         
                         elif 'StarMetal' in param:
                             if 'H' in param[-1]: 
@@ -672,7 +686,8 @@ def EvolutionDF(param, IDs, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory
             
             try:
                 data = ImportField(param, ID)
-            except Exception:
+            except Exception as e:
+                print(f"Exception: {e}")
                 data = np.array([])
             
             # Ensure data has length 100
