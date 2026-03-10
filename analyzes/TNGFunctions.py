@@ -2243,7 +2243,7 @@ def makedataevolution(names, columns, row, PhasingPlot = False,
                 else:
                     population = name + split
                     values = makeDF(population, param,  Name = Name, dfName=dfName,  SubfindIDkey = SubfindIDkey, IDs=IDs)
-
+                    print(values)
                 #print(population, param,dfName, SubfindIDkey)
                 
                 #print(values)
@@ -2691,7 +2691,7 @@ def extractPopulation(sample, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHisto
 
     # Restricting the sample if sample is not 'All'
     if sample != 'All' and sample != '':
-        for name in ['SubDiffuse', 'Diffuse',  'Normal', 'SBC', 'MBC', 'SubCompact', 'Compact']:
+        for name in ['SubDiffuse', 'Diffuse',  'Normal', 'SBC', 'MBC', 'SubCompact', 'CompactSB', 'Compact']:
             if name in sample :
                 df = df.loc[df[Name] == name]
                 break
