@@ -2243,7 +2243,6 @@ def makedataevolution(names, columns, row, PhasingPlot = False,
                 else:
                     population = name + split
                     values = makeDF(population, param,  Name = Name, dfName=dfName,  SubfindIDkey = SubfindIDkey, IDs=IDs)
-                    print(values)
                 #print(population, param,dfName, SubfindIDkey)
                 
                 #print(values)
@@ -2434,6 +2433,7 @@ def makedata(names, columns, row, Type, snap=[99], dfName='Sample', Name = 'Name
 
     return data
 
+
 def makeDF(population, param, dfName = 'Sample', Name = 'Name', IDs=None,  TreeHybridSubhalo = False, SubfindIDkey = 'SubfindID_99', PATH = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory',  SIM = 'TNG50', verbose=False):
     '''
     Make the parameter evolution dataframe for a specific sample
@@ -2472,16 +2472,16 @@ def makeDF(population, param, dfName = 'Sample', Name = 'Name', IDs=None,  TreeH
     #take subhalo for the sample
     dSample = extractPopulation(
                 population, PATH=PATH, dfName=dfName, Name=Name)
-
     
     #restricting dfEvolution only for subhalos in dfSample
-    
+ 
     if verbose:
         print('Take the '+param+' EVOLUTION for the '+population+' SAMPLE  ...')
         
     if not TreeHybridSubhalo:
 
         if type(IDs) == int or IDs is None:
+            
             keys = dSample[SubfindIDkey]
             try:
                 df = dfEvolution[keys.astype(str)].copy()

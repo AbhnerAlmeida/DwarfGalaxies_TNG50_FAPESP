@@ -28,8 +28,6 @@ import MATH
 import TNGFunctions as TNG
 import PlotFunctions as plot
 
-plt.style.use(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/src/abhner.mplstyle")
-
 
 logger = logging.getLogger(__name__)
 
@@ -397,7 +395,7 @@ def backend_download_cutout_by_subfindid(
         }
 
     cutout_url = f"{TNG_BASE}{sim_name}/snapshots/{int(snap)}/subhalos/{int(subfind_id)}/cutout.hdf5"
-    print(cutout_url)
+
     r = _api_get(cutout_url, params=fields, stream=True)
 
     _ensure_dir(os.path.dirname(outpath))
@@ -496,13 +494,13 @@ def get_halfmass_radius_for_z0(ID_z0: int,
 
     colname = f'SubhaloHalfmassRadType{ptype}'
     if colname in tree.columns and len(row) > 0 and pd.notna(row[colname].iloc[0]):
-        return float(row[colname].iloc[0])
+        return float(row[colname].iloc[0] / (1+dfTime.z.loc[dfTime.Snap == snap].values[0]) / h )
 
     cat = backend_load_subhalo_catalog_entry(snap=snap, subfind_id=subfind_id, sim=sim)
     if 'SubhaloHalfmassRadType' not in cat:
         raise KeyError("Catalog entry does not contain 'SubhaloHalfmassRadType'")
 
-    return float(cat['SubhaloHalfmassRadType'][ptype])
+    return float(cat['SubhaloHalfmassRadType'][ptype] / (1+dfTime.z.loc[dfTime.Snap == snap].values[0]) / h  )
 
 
 def get_subhalo_state_from_z0(ID_z0: int,
@@ -693,6 +691,7 @@ def MakeMap(
         TREE_CACHE_DIR=TREE_CACHE_DIR,
         force_download=FORCE_CUTOUT_DOWNLOAD
     )
+    
 
     rhalf0 = state['rhalf0']
     rhalf4 = state['rhalf4']
@@ -1069,6 +1068,8 @@ def PlotMap(
             if np.isnan(ID):
                 ax.axis('off')
                 continue
+            
+            print('ID: ', ID)
 
             panel_cmap, panel_vmin, panel_vmax, do_log = _panel_display_settings(
                 Param, PartType, cmap_dm, vmin, vmax
@@ -1187,3 +1188,1166 @@ def PlotMap(
 
     plot.savefig(savepath, savefigname, False)
     return
+
+
+
+# =========================================================
+# SUBHALO DISTRIBUTION / GROUPING
+# =========================================================
+
+def backend_load_subhalo_spatial_entry(snap: int, subfind_id: int, sim: str = 'TNG50-1') -> dict:
+    """
+    Load spatial/basic properties of one subhalo from the TNG API catalog.
+    Tries a few possible key conventions to remain robust.
+    """
+    sim_name = _sim_api_name(sim)
+    subhalo_url = f"{TNG_BASE}{sim_name}/snapshots/{int(snap)}/subhalos/{int(subfind_id)}/"
+    sub = _api_get(subhalo_url).json()
+
+    # --- position ---
+    if all(k in sub for k in ["pos_x", "pos_y", "pos_z"]):
+        pos = np.array([sub["pos_x"], sub["pos_y"], sub["pos_z"]], dtype=float)
+    elif "pos" in sub:
+        pos = np.array(sub["pos"], dtype=float)
+    elif "SubhaloPos" in sub:
+        pos = np.array(sub["SubhaloPos"], dtype=float)
+    else:
+        raise KeyError(f"Could not find subhalo position keys in API response for snap={snap}, subfind={subfind_id}")
+
+    # --- velocity ---
+    if all(k in sub for k in ["vel_x", "vel_y", "vel_z"]):
+        vel = np.array([sub["vel_x"], sub["vel_y"], sub["vel_z"]], dtype=float)
+    elif "vel" in sub:
+        vel = np.array(sub["vel"], dtype=float)
+    elif "SubhaloVel" in sub:
+        vel = np.array(sub["SubhaloVel"], dtype=float)
+    else:
+        vel = np.array([np.nan, np.nan, np.nan], dtype=float)
+
+    # --- halfmass radii ---
+    if "halfmassrad_type" in sub:
+        rhalf = np.array(sub["halfmassrad_type"], dtype=float)
+    elif "SubhaloHalfmassRadType" in sub:
+        rhalf = np.array(sub["SubhaloHalfmassRadType"], dtype=float)
+    else:
+        rhalf = np.full(6, np.nan)
+
+    # --- masses ---
+    if "mass_log_msun" in sub:
+        mtotal_log = float(sub["mass_log_msun"])
+    elif "mass" in sub:
+        mtotal_log = np.log10(float(sub["mass"]) * 1e10 / h) if sub["mass"] > 0 else np.nan
+    else:
+        mtotal_log = np.nan
+
+    if "massinhalfrad_type" in sub:
+        mhalf_type = np.array(sub["massinhalfrad_type"], dtype=float)
+    elif "SubhaloMassInHalfRadType" in sub:
+        mhalf_type = np.array(sub["SubhaloMassInHalfRadType"], dtype=float)
+    else:
+        mhalf_type = np.full(6, np.nan)
+
+    # --- group number ---
+    if "grnr" in sub:
+        grnr = int(sub["grnr"])
+    elif "SubhaloGrNr" in sub:
+        grnr = int(sub["SubhaloGrNr"])
+    else:
+        grnr = -1
+
+    return {
+        "pos": pos,
+        "vel": vel,
+        "rhalf0": float(rhalf[0]) if len(rhalf) > 0 else np.nan,
+        "rhalf4": float(rhalf[4]) if len(rhalf) > 4 else np.nan,
+        "mtotal_logmsun": mtotal_log,
+        "mstar_half": float(mhalf_type[4]) if len(mhalf_type) > 4 else np.nan,
+        "mgas_half": float(mhalf_type[0]) if len(mhalf_type) > 0 else np.nan,
+        "grnr": grnr,
+    }
+
+
+def _friends_of_friends_labels(pos: np.ndarray, linking_length: float) -> np.ndarray:
+    """
+    Simple FoF grouping in 3D using a fixed linking length (same units as pos).
+    Returns cluster labels.
+    """
+    n = len(pos)
+    if n == 0:
+        return np.array([], dtype=int)
+
+    labels = -np.ones(n, dtype=int)
+    current_label = 0
+
+    for i in range(n):
+        if labels[i] != -1:
+            continue
+
+        labels[i] = current_label
+        queue = [i]
+
+        while queue:
+            k = queue.pop(0)
+            dx = pos - pos[k]
+            dist = np.sqrt(np.sum(dx**2, axis=1))
+            neighbors = np.where(dist <= linking_length)[0]
+
+            for nb in neighbors:
+                if labels[nb] == -1:
+                    labels[nb] = current_label
+                    queue.append(nb)
+
+        current_label += 1
+
+    return labels
+
+
+def build_subhalo_distribution_catalog(
+    IDs_z0,
+    snap,
+    ref_id=None,
+    sim='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    TREE_CACHE_DIR=None,
+    linking_length=30.0
+):
+    """
+    Build a catalog with the spatial distribution of a list of z=0 IDs at a given snapshot.
+
+    Parameters
+    ----------
+    IDs_z0 : sequence
+        z=0 subhalo IDs
+    snap : int
+        snapshot where the distribution will be evaluated
+    ref_id : int or None
+        z=0 ID used as the reference center. If None, the median position is used.
+    linking_length : float
+        FoF-like linking length in kpc (physical)
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        table with positions, group IDs, and basic properties
+    """
+    IDs_z0 = np.array(IDs_z0, dtype=int)
+    snap = int(snap)
+
+    if TREE_CACHE_DIR is None:
+        TREE_CACHE_DIR = os.path.join(PATH, SIMTNG, 'Trees')
+
+    rows = []
+
+    for ID_z0 in IDs_z0:
+        try:
+            state = get_subhalo_state_from_z0(
+                ID_z0=ID_z0,
+                snap=snap,
+                tree_cache_dir=TREE_CACHE_DIR,
+                sim=sim
+            )
+
+            entry = backend_load_subhalo_spatial_entry(
+                snap=snap,
+                subfind_id=state['subfind_id'],
+                sim=sim
+            )
+
+            # API positions are typically ckpc/h; convert to physical kpc
+            zsnap = _get_redshift_from_snap(snap)
+            pos_phys = np.array(entry["pos"], dtype=float) / (1.0 + zsnap) / h
+
+            rows.append({
+                "ID_z0": int(ID_z0),
+                "snap": snap,
+                "subfind_id": int(state["subfind_id"]),
+                "x": pos_phys[0],
+                "y": pos_phys[1],
+                "z": pos_phys[2],
+                "vx": entry["vel"][0],
+                "vy": entry["vel"][1],
+                "vz": entry["vel"][2],
+                "rhalf0": entry["rhalf0"],
+                "rhalf4": entry["rhalf4"],
+                "mtotal_logmsun": entry["mtotal_logmsun"],
+                "grnr": entry["grnr"],
+            })
+
+        except Exception as e:
+            logger.warning(f"Failed to load spatial info for ID_z0={ID_z0} at snap={snap}: {e}")
+
+    df = pd.DataFrame(rows)
+
+    if len(df) == 0:
+        raise ValueError("No valid subhalos could be loaded.")
+
+    # reference center
+    if ref_id is not None and np.any(df["ID_z0"].values == int(ref_id)):
+        ref = df.loc[df["ID_z0"] == int(ref_id)].iloc[0]
+        center = np.array([ref["x"], ref["y"], ref["z"]], dtype=float)
+    else:
+        center = np.array([
+            np.nanmedian(df["x"].values),
+            np.nanmedian(df["y"].values),
+            np.nanmedian(df["z"].values)
+        ], dtype=float)
+
+    rel = np.vstack([
+        FixPeriodic(df["x"].values - center[0], sim=sim),
+        FixPeriodic(df["y"].values - center[1], sim=sim),
+        FixPeriodic(df["z"].values - center[2], sim=sim)
+    ]).T
+
+    df["dx"] = rel[:, 0]
+    df["dy"] = rel[:, 1]
+    df["dz"] = rel[:, 2]
+    df["r3d"] = np.sqrt(df["dx"]**2 + df["dy"]**2 + df["dz"]**2)
+
+    labels = _friends_of_friends_labels(rel, linking_length=linking_length)
+    df["cluster_id"] = labels
+
+    # cluster sizes
+    counts = df["cluster_id"].value_counts().to_dict()
+    df["cluster_size"] = df["cluster_id"].map(counts)
+
+    return df
+
+
+def PlotSubhaloDistribution(
+    IDs_z0,
+    snap,
+    ref_id=None,
+    axis='z',
+    sim='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    TREE_CACHE_DIR=None,
+    linking_length=30.0,
+    width=None,
+    annotate=True,
+    draw_rhalf=True,
+    marker_scale=180,
+    alpha=0.85,
+    savepath='fig/PlotMap',
+    savefigname='SubhaloDistribution',
+    fontlabel=16
+):
+    """
+    Plot the spatial distribution of selected subhalos in a common reference frame.
+
+    axis='z'  -> projection on (x,y)
+    axis='x'  -> projection on (y,z)
+    """
+    _validate_axis(axis)
+
+    df = build_subhalo_distribution_catalog(
+        IDs_z0=IDs_z0,
+        snap=snap,
+        ref_id=ref_id,
+        sim=sim,
+        SIMTNG=SIMTNG,
+        PATH=PATH,
+        TREE_CACHE_DIR=TREE_CACHE_DIR,
+        linking_length=linking_length
+    )
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # choose projected coordinates
+    if axis == 'z':
+        px = df["dx"].values
+        py = df["dy"].values
+        xlabel = r'$x/\mathrm{kpc}$'
+        ylabel = r'$y/\mathrm{kpc}$'
+    elif axis == 'x':
+        px = df["dy"].values
+        py = df["dz"].values
+        xlabel = r'$y/\mathrm{kpc}$'
+        ylabel = r'$z/\mathrm{kpc}$'
+
+    # marker sizes
+    mlog = df["mtotal_logmsun"].values
+    if np.all(~np.isfinite(mlog)):
+        sizes = np.full(len(df), marker_scale)
+    else:
+        mmin = np.nanmin(mlog[np.isfinite(mlog)])
+        sizes = marker_scale * (0.4 + (np.nan_to_num(mlog, nan=mmin) - mmin + 0.2))
+
+    # color by cluster_id
+    cluster_ids = np.sort(df["cluster_id"].unique())
+    cmap = plt.cm.tab10
+
+    for i, cid in enumerate(cluster_ids):
+        sel = df["cluster_id"].values == cid
+        color = cmap(i % 10)
+
+        ax.scatter(
+            px[sel], py[sel],
+            s=sizes[sel],
+            color=color,
+            alpha=alpha,
+            edgecolor='k',
+            linewidth=0.8,
+            label=f'cluster {cid} (N={np.sum(sel)})'
+        )
+
+        if draw_rhalf:
+            for _, row in df.loc[sel].iterrows():
+                rr = row["rhalf4"] if np.isfinite(row["rhalf4"]) else row["rhalf0"]
+                if np.isfinite(rr) and rr > 0:
+                    if axis == 'z':
+                        cx, cy = row["dx"], row["dy"]
+                    else:
+                        cx, cy = row["dy"], row["dz"]
+
+                    circ = plt.Circle((cx, cy), rr, fill=False, color=color, alpha=0.35, lw=1.0)
+                    ax.add_patch(circ)
+
+    if annotate:
+        for _, row in df.iterrows():
+            if axis == 'z':
+                tx, ty = row["dx"], row["dy"]
+            else:
+                tx, ty = row["dy"], row["dz"]
+
+            ax.text(
+                tx, ty,
+                f'{int(row["ID_z0"])}',
+                fontsize=0.75 * fontlabel,
+                ha='left',
+                va='bottom'
+            )
+
+    ax.axhline(0, ls='--', lw=1, color='gray', alpha=0.5)
+    ax.axvline(0, ls='--', lw=1, color='gray', alpha=0.5)
+
+    ax.set_xlabel(xlabel, fontsize=fontlabel)
+    ax.set_ylabel(ylabel, fontsize=fontlabel)
+    ax.tick_params(labelsize=0.95 * fontlabel)
+
+    zlab = _format_zlabel(snap)
+    ax.set_title(
+        f'Subhalo spatial distribution\nsnap={snap} ({zlab}), linking_length={linking_length:.1f} kpc',
+        fontsize=fontlabel
+    )
+
+    if width is not None:
+        ax.set_xlim(-width, width)
+        ax.set_ylim(-width, width)
+
+    ax.legend(fontsize=0.8 * fontlabel, loc='best', framealpha=0.9)
+    ax.set_aspect('equal')
+
+    plot.savefig(savepath, savefigname, False)
+
+    return df, fig, ax
+
+
+def backend_load_subhalo_spatial_entry(snap: int, subfind_id: int, sim: str = 'TNG50-1') -> dict:
+    """
+    Load basic spatial and dynamical properties of one subhalo from the TNG API catalog.
+    """
+    sim_name = _sim_api_name(sim)
+    subhalo_url = f"{TNG_BASE}{sim_name}/snapshots/{int(snap)}/subhalos/{int(subfind_id)}/"
+    sub = _api_get(subhalo_url).json()
+
+    # position
+    if all(k in sub for k in ['pos_x', 'pos_y', 'pos_z']):
+        pos = np.array([sub['pos_x'], sub['pos_y'], sub['pos_z']], dtype=float)
+    elif 'pos' in sub:
+        pos = np.array(sub['pos'], dtype=float)
+    elif 'SubhaloPos' in sub:
+        pos = np.array(sub['SubhaloPos'], dtype=float)
+    else:
+        raise KeyError(f"Position not found for snap={snap}, subfind_id={subfind_id}")
+
+    # velocity
+    if all(k in sub for k in ['vel_x', 'vel_y', 'vel_z']):
+        vel = np.array([sub['vel_x'], sub['vel_y'], sub['vel_z']], dtype=float)
+    elif 'vel' in sub:
+        vel = np.array(sub['vel'], dtype=float)
+    elif 'SubhaloVel' in sub:
+        vel = np.array(sub['SubhaloVel'], dtype=float)
+    else:
+        vel = np.array([np.nan, np.nan, np.nan], dtype=float)
+
+    # halfmass radii
+    if 'halfmassrad_type' in sub:
+        rhalf = np.array(sub['halfmassrad_type'], dtype=float)
+    elif 'SubhaloHalfmassRadType' in sub:
+        rhalf = np.array(sub['SubhaloHalfmassRadType'], dtype=float)
+    else:
+        rhalf = np.full(6, np.nan)
+
+    # mass
+    if 'mass_log_msun' in sub:
+        mtotal_log = float(sub['mass_log_msun'])
+    elif 'mass' in sub and sub['mass'] > 0:
+        mtotal_log = np.log10(float(sub['mass']) * 1e10 / h)
+    else:
+        mtotal_log = np.nan
+
+    # group number
+    if 'grnr' in sub:
+        grnr = int(sub['grnr'])
+    elif 'SubhaloGrNr' in sub:
+        grnr = int(sub['SubhaloGrNr'])
+    else:
+        grnr = -1
+
+    return {
+        'pos': pos,
+        'vel': vel,
+        'rhalf0': float(rhalf[0]) if len(rhalf) > 0 else np.nan,
+        'rhalf4': float(rhalf[4]) if len(rhalf) > 4 else np.nan,
+        'mtotal_logmsun': mtotal_log,
+        'grnr': grnr
+    }
+
+
+def build_group_catalog(
+    IDs_z0,
+    snap,
+    ref_id=None,
+    sim='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    TREE_CACHE_DIR=None
+):
+    """
+    Build a catalog of selected subhalos in a common group frame.
+    """
+    IDs_z0 = np.array(IDs_z0, dtype=int)
+    snap = int(snap)
+
+    if TREE_CACHE_DIR is None:
+        TREE_CACHE_DIR = os.path.join(PATH, SIMTNG, 'Trees')
+
+    rows = []
+
+    for ID_z0 in IDs_z0:
+        try:
+            state = get_subhalo_state_from_z0(
+                ID_z0=ID_z0,
+                snap=snap,
+                tree_cache_dir=TREE_CACHE_DIR,
+                sim=sim
+            )
+
+            entry = backend_load_subhalo_spatial_entry(
+                snap=snap,
+                subfind_id=state['subfind_id'],
+                sim=sim
+            )
+
+            zsnap = _get_redshift_from_snap(snap)
+
+            # positions from catalog are usually ckpc/h -> convert to physical kpc
+            pos = np.array(entry['pos'], dtype=float) / (1.0 + zsnap) / h
+            vel = np.array(entry['vel'], dtype=float)
+
+            rows.append({
+                'ID_z0': int(ID_z0),
+                'subfind_id': int(state['subfind_id']),
+                'snap': snap,
+                'x': pos[0],
+                'y': pos[1],
+                'z': pos[2],
+                'vx': vel[0],
+                'vy': vel[1],
+                'vz': vel[2],
+                'rhalf0': entry['rhalf0'],
+                'rhalf4': entry['rhalf4'],
+                'mtotal_logmsun': entry['mtotal_logmsun'],
+                'grnr': entry['grnr']
+            })
+
+        except Exception as e:
+            logger.warning(f"Failed to load ID_z0={ID_z0} at snap={snap}: {e}")
+
+    df = pd.DataFrame(rows)
+    if len(df) == 0:
+        raise ValueError("No valid subhalos found.")
+
+    # choose reference object or median center
+    if ref_id is not None and np.any(df['ID_z0'].values == int(ref_id)):
+        ref = df.loc[df['ID_z0'] == int(ref_id)].iloc[0]
+        center = np.array([ref['x'], ref['y'], ref['z']], dtype=float)
+        vcenter = np.array([ref['vx'], ref['vy'], ref['vz']], dtype=float)
+    else:
+        center = np.array([
+            np.nanmedian(df['x'].values),
+            np.nanmedian(df['y'].values),
+            np.nanmedian(df['z'].values)
+        ])
+        vcenter = np.array([
+            np.nanmedian(df['vx'].values),
+            np.nanmedian(df['vy'].values),
+            np.nanmedian(df['vz'].values)
+        ])
+
+    dx = FixPeriodic(df['x'].values - center[0], sim=sim)
+    dy = FixPeriodic(df['y'].values - center[1], sim=sim)
+    dz = FixPeriodic(df['z'].values - center[2], sim=sim)
+
+    df['dx'] = dx
+    df['dy'] = dy
+    df['dz'] = dz
+    df['dvx'] = df['vx'].values - vcenter[0]
+    df['dvy'] = df['vy'].values - vcenter[1]
+    df['dvz'] = df['vz'].values - vcenter[2]
+    df['r3d'] = np.sqrt(dx**2 + dy**2 + dz**2)
+
+    return df
+
+def PlotGroupMap(
+    IDs_z0,
+    snap,
+    map_id=None,
+    ref_id=None,
+    PartType='PartType4',
+    Param='Mass',
+    axis='z',
+    width=150,
+    r='infinity',
+    show_velocity=True,
+    annotate=True,
+    draw_rhalf=True,
+    cmap='bone',
+    arrow_scale=1.0,
+    marker_scale=180,
+    fontlabel=16,
+    savepath='fig/PlotMap',
+    savefigname='GroupMap',
+    SIMS='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    HOME=os.getenv("HOME") + '/',
+    TREE_CACHE_DIR=None,
+    FORCE_CUTOUT_DOWNLOAD=False
+):
+    """
+    Plot a common-frame map of a group and overlay selected subhalos.
+    """
+
+    _validate_axis(axis)
+
+    if TREE_CACHE_DIR is None:
+        TREE_CACHE_DIR = os.path.join(PATH, SIMTNG, 'Trees')
+
+    # build catalog of selected objects
+    df = build_group_catalog(
+        IDs_z0=IDs_z0,
+        snap=snap,
+        ref_id=ref_id,
+        sim=SIMS,
+        SIMTNG=SIMTNG,
+        PATH=PATH,
+        TREE_CACHE_DIR=TREE_CACHE_DIR
+    )
+
+    # choose object used to build the background particle map
+    if map_id is None:
+        map_id = int(df.iloc[0]['ID_z0'])
+
+    # build particle map in the frame of map_id
+    img, extent = MakeMap(
+        ID=map_id,
+        snap=snap,
+        PartType=PartType,
+        axis=axis,
+        r=r,
+        Param=Param,
+        VelPlot=False,
+        width=width,
+        cmap_dm=cmap,
+        PATH=PATH,
+        SIMS=SIMS,
+        SIMTNG=SIMTNG,
+        HOME=HOME,
+        TREE_CACHE_DIR=TREE_CACHE_DIR,
+        FORCE_CUTOUT_DOWNLOAD=FORCE_CUTOUT_DOWNLOAD
+    )
+
+    if img is None or extent is None:
+        raise ValueError(f"Could not build background map for map_id={map_id}")
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    do_log = (Param in ['Mass', 'T', 'MassSF', 'SFR']) or _safe_str_contains(Param, 'Mass')
+    img_plot = _safe_log10_image(img) if do_log else np.where(np.isfinite(img), img, np.nan)
+
+    ax.imshow(img_plot, extent=extent, origin='lower', cmap=cmap)
+
+    # choose projected coordinates
+    if axis == 'z':
+        px = df['dx'].values
+        py = df['dy'].values
+        pvx = df['dvx'].values
+        pvy = df['dvy'].values
+        xlabel = r'$x/\mathrm{kpc}$'
+        ylabel = r'$y/\mathrm{kpc}$'
+    elif axis == 'x':
+        px = df['dy'].values
+        py = df['dz'].values
+        pvx = df['dvy'].values
+        pvy = df['dvz'].values
+        xlabel = r'$y/\mathrm{kpc}$'
+        ylabel = r'$z/\mathrm{kpc}$'
+        
+    inside = (
+                    np.isfinite(px) & np.isfinite(py) &
+                    (px >= -width) & (px <= width) &
+                    (py >= -width) & (py <= width)
+                )
+
+    # marker sizes from total mass
+    mlog = df['mtotal_logmsun'].values
+    if np.all(~np.isfinite(mlog)):
+        sizes = np.full(len(df), marker_scale)
+    else:
+        mmin = np.nanmin(mlog[np.isfinite(mlog)])
+        sizes = marker_scale * (0.4 + (np.nan_to_num(mlog, nan=mmin) - mmin + 0.2))
+
+    ax.scatter(
+        px[inside], py[inside],
+        s=sizes[inside],
+        facecolor='none',
+        edgecolor='cyan',
+        linewidth=1.8,
+        zorder=4
+    )
+
+    # half-mass radius circles
+    if draw_rhalf:
+        for _, row in df.iterrows():
+            rr = row['rhalf4'] if PartType == 'PartType4' else row['rhalf0']
+            if np.isfinite(rr) and rr > 0:
+                if axis == 'z':
+                    cx, cy = row['dx'], row['dy']
+                else:
+                    cx, cy = row['dy'], row['dz']
+
+                circ = plt.Circle((cx, cy), rr, fill=False, color='lime', lw=1.2, alpha=0.8, zorder=3,
+                                  clip_on=True)
+                ax.add_patch(circ)
+
+    # velocity arrows
+    if show_velocity:
+        ax.quiver(
+            px[inside], py[inside],
+            pvx[inside], pvy[inside],
+            angles='xy', scale_units='xy', scale=20.0 / arrow_scale,
+            color='red', width=0.004, zorder=5
+        )
+
+    # labels
+    if annotate:
+        for _, row in df.loc[inside].iterrows():
+            if axis == 'z':
+                tx, ty = row['dx'], row['dy']
+            else:
+                tx, ty = row['dy'], row['dz']
+    
+            ax.text(
+                tx, ty,
+                f"{int(row['ID_z0'])}",
+                color='white',
+                fontsize=0.8 * fontlabel,
+                ha='left',
+                va='bottom',
+                zorder=6,
+                clip_on=True
+            )
+            
+            
+
+    ax.axhline(0, ls='--', lw=1, color='white', alpha=0.5)
+    ax.axvline(0, ls='--', lw=1, color='white', alpha=0.5)
+
+    ax.set_xlim(-width, width)
+    ax.set_ylim(-width, width)
+    ax.set_xlabel(xlabel, fontsize=fontlabel)
+    ax.set_ylabel(ylabel, fontsize=fontlabel)
+    ax.set_title(f'Group map | snap={snap} | map_id={map_id}', fontsize=fontlabel)
+    ax.set_aspect('equal')
+    ax.tick_params(labelsize=0.95 * fontlabel)
+
+    plot.savefig(savepath, savefigname, False)
+
+    return df, fig, ax
+
+
+def backend_load_subhalo_spatial_entry(snap: int, subfind_id: int, sim: str = 'TNG50-1') -> dict:
+    sim_name = _sim_api_name(sim)
+    subhalo_url = f"{TNG_BASE}{sim_name}/snapshots/{int(snap)}/subhalos/{int(subfind_id)}/"
+    sub = _api_get(subhalo_url).json()
+
+    if all(k in sub for k in ['pos_x', 'pos_y', 'pos_z']):
+        pos = np.array([sub['pos_x'], sub['pos_y'], sub['pos_z']], dtype=float)
+    elif 'pos' in sub:
+        pos = np.array(sub['pos'], dtype=float)
+    elif 'SubhaloPos' in sub:
+        pos = np.array(sub['SubhaloPos'], dtype=float)
+    else:
+        raise KeyError(f"Position not found for snap={snap}, subfind={subfind_id}")
+
+    if all(k in sub for k in ['vel_x', 'vel_y', 'vel_z']):
+        vel = np.array([sub['vel_x'], sub['vel_y'], sub['vel_z']], dtype=float)
+    elif 'vel' in sub:
+        vel = np.array(sub['vel'], dtype=float)
+    elif 'SubhaloVel' in sub:
+        vel = np.array(sub['SubhaloVel'], dtype=float)
+    else:
+        vel = np.array([np.nan, np.nan, np.nan], dtype=float)
+
+    if 'halfmassrad_type' in sub:
+        rhalf = np.array(sub['halfmassrad_type'], dtype=float)
+    elif 'SubhaloHalfmassRadType' in sub:
+        rhalf = np.array(sub['SubhaloHalfmassRadType'], dtype=float)
+    else:
+        rhalf = np.full(6, np.nan)
+
+    if 'mass_log_msun' in sub:
+        mtotal_log = float(sub['mass_log_msun'])
+    elif 'mass' in sub and sub['mass'] > 0:
+        mtotal_log = np.log10(float(sub['mass']) * 1e10 / h)
+    else:
+        mtotal_log = np.nan
+
+    if 'grnr' in sub:
+        grnr = int(sub['grnr'])
+    elif 'SubhaloGrNr' in sub:
+        grnr = int(sub['SubhaloGrNr'])
+    else:
+        grnr = -1
+
+    return {
+        'pos': pos,
+        'vel': vel,
+        'rhalf0': float(rhalf[0]) if len(rhalf) > 0 else np.nan,
+        'rhalf4': float(rhalf[4]) if len(rhalf) > 4 else np.nan,
+        'mtotal_logmsun': mtotal_log,
+        'grnr': grnr
+    }
+
+def build_group_catalog(
+    IDs_z0,
+    snap,
+    ref_id=None,
+    sim='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    TREE_CACHE_DIR=None
+):
+    IDs_z0 = np.array(IDs_z0, dtype=int)
+    snap = int(snap)
+
+    if TREE_CACHE_DIR is None:
+        TREE_CACHE_DIR = os.path.join(PATH, SIMTNG, 'Trees')
+
+    rows = []
+
+    for ID_z0 in IDs_z0:
+        try:
+            state = get_subhalo_state_from_z0(
+                ID_z0=ID_z0,
+                snap=snap,
+                tree_cache_dir=TREE_CACHE_DIR,
+                sim=sim
+            )
+
+            entry = backend_load_subhalo_spatial_entry(
+                snap=snap,
+                subfind_id=state['subfind_id'],
+                sim=sim
+            )
+
+            zsnap = _get_redshift_from_snap(snap)
+
+            # catálogo costuma vir em ckpc/h
+            pos = np.array(entry['pos'], dtype=float) / (1.0 + zsnap) / h
+            vel = np.array(entry['vel'], dtype=float)
+
+            rows.append({
+                'ID_z0': int(ID_z0),
+                'subfind_id': int(state['subfind_id']),
+                'snap': snap,
+                'x': pos[0],
+                'y': pos[1],
+                'z': pos[2],
+                'vx': vel[0],
+                'vy': vel[1],
+                'vz': vel[2],
+                'rhalf0': entry['rhalf0'],
+                'rhalf4': entry['rhalf4'],
+                'mtotal_logmsun': entry['mtotal_logmsun'],
+                'grnr': entry['grnr']
+            })
+
+        except Exception as e:
+            logger.warning(f"Failed to load group entry for ID_z0={ID_z0}, snap={snap}: {e}")
+
+    df = pd.DataFrame(rows)
+    if len(df) == 0:
+        raise ValueError("No valid subhalos found.")
+
+    if ref_id is not None and np.any(df['ID_z0'].values == int(ref_id)):
+        ref = df.loc[df['ID_z0'] == int(ref_id)].iloc[0]
+        center = np.array([ref['x'], ref['y'], ref['z']], dtype=float)
+        vcenter = np.array([ref['vx'], ref['vy'], ref['vz']], dtype=float)
+    else:
+        center = np.array([
+            np.nanmedian(df['x'].values),
+            np.nanmedian(df['y'].values),
+            np.nanmedian(df['z'].values)
+        ], dtype=float)
+
+        vcenter = np.array([
+            np.nanmedian(df['vx'].values),
+            np.nanmedian(df['vy'].values),
+            np.nanmedian(df['vz'].values)
+        ], dtype=float)
+
+    dx = FixPeriodic(df['x'].values - center[0], sim=sim)
+    dy = FixPeriodic(df['y'].values - center[1], sim=sim)
+    dz = FixPeriodic(df['z'].values - center[2], sim=sim)
+
+    df['dx'] = dx
+    df['dy'] = dy
+    df['dz'] = dz
+    df['dvx'] = df['vx'].values - vcenter[0]
+    df['dvy'] = df['vy'].values - vcenter[1]
+    df['dvz'] = df['vz'].values - vcenter[2]
+    df['r3d'] = np.sqrt(dx**2 + dy**2 + dz**2)
+
+    return df, center, vcenter
+
+def PlotGroupMapCombined(
+    IDs_z0,
+    snap,
+    ref_id=None,
+    PartType='PartType4',
+    Param='Mass',
+    axis='z',
+    width=80,
+    r='infinity',
+    lenLim=2500000,
+    seed=160401,
+    show_velocity=True,
+    annotate=True,
+    draw_rhalf=True,
+    cmap_dm='bone',
+    arrow_scale=1.0,
+    marker_scale=180,
+    fontlabel=16,
+    savepath='fig/PlotMap',
+    savefigname='GroupMapCombined',
+    SIMS='TNG50-1',
+    SIMTNG='TNG50',
+    PATH=os.path.join(os.getenv("HOME"), 'TNG_Analyzes', 'SubhaloHistory'),
+    HOME=os.getenv("HOME") + '/',
+    TREE_CACHE_DIR=None,
+    FORCE_CUTOUT_DOWNLOAD=False
+):
+    _validate_axis(axis)
+    np.random.seed(seed)
+
+    if TREE_CACHE_DIR is None:
+        TREE_CACHE_DIR = os.path.join(PATH, SIMTNG, 'Trees')
+
+    # catálogo do grupo
+    df, group_center, group_vcenter = build_group_catalog(
+        IDs_z0=IDs_z0,
+        snap=snap,
+        ref_id=ref_id,
+        sim=SIMS,
+        SIMTNG=SIMTNG,
+        PATH=PATH,
+        TREE_CACHE_DIR=TREE_CACHE_DIR
+    )
+
+    # projeção
+    if axis == 'x':
+        prad = 0
+        t = 90
+        xlabel = r'$y/\mathrm{kpc}$'
+        ylabel = r'$z/\mathrm{kpc}$'
+    elif axis == 'z':
+        prad = 0
+        t = 0
+        xlabel = r'$x/\mathrm{kpc}$'
+        ylabel = r'$y/\mathrm{kpc}$'
+
+    all_pos = []
+    all_mass = []
+
+    # opcional: para propriedades adicionais
+    all_value = []
+
+    for ID in df['ID_z0'].values:
+        try:
+            target_file, state = ensure_cutout_for_z0_id(
+                ID_z0=int(ID),
+                snap=int(snap),
+                PATH=PATH,
+                SIMS=SIMS,
+                SIMTNG=SIMTNG,
+                HOME=HOME,
+                TREE_CACHE_DIR=TREE_CACHE_DIR,
+                force_download=FORCE_CUTOUT_DOWNLOAD
+            )
+
+            with h5py.File(target_file, 'r') as file:
+                if PartType not in file:
+                    continue
+
+                zsnap = _get_redshift_from_snap(snap)
+
+                pos = file[PartType]['Coordinates'][:] / (1.0 + zsnap) / h
+                mass = file[PartType]['Masses'][:] * 1e10 / h
+
+                if 'Velocities' in file[PartType]:
+                    vel = file[PartType]['Velocities'][:] * np.sqrt(1.0 / (1.0 + zsnap))
+                else:
+                    vel = np.zeros_like(pos)
+
+                # centro local do subhalo, usando estrelas se existirem
+                try:
+                    pos_star, mass_star, vel_star = _try_read_particle_block(file, 'PartType4', snap)
+                    if len(mass_star) > 1 and np.sum(mass_star) > 0:
+                        cen_local, vel_local = _mass_weighted_center_and_velocity(pos_star, vel_star, mass_star)
+                    else:
+                        pos_gas, mass_gas, vel_gas = _try_read_particle_block(file, 'PartType0', snap)
+                        cen_local, vel_local = _mass_weighted_center_and_velocity(pos_gas, vel_gas, mass_gas)
+                except Exception:
+                    cen_local = np.array([0.0, 0.0, 0.0])
+                    vel_local = np.array([0.0, 0.0, 0.0])
+
+                # posição absoluta do centro catalogado do subhalo
+                row = df.loc[df['ID_z0'] == int(ID)].iloc[0]
+                subhalo_abs_center = np.array([row['x'], row['y'], row['z']], dtype=float)
+                subhalo_abs_vel = np.array([row['vx'], row['vy'], row['vz']], dtype=float)
+
+                # converter partículas para frame absoluto do grupo
+                # partícula relativa ao centro local + posição absoluta do centro
+                pos_abs = FixPeriodic(pos - cen_local, sim=SIMS) + subhalo_abs_center
+                pos_rel_group = FixPeriodic(pos_abs - group_center, sim=SIMS)
+
+                vel_rel_group = (vel - vel_local) + subhalo_abs_vel - group_vcenter
+
+                # corte espacial
+                if axis == 'z':
+                    mask = (
+                        np.isfinite(pos_rel_group[:, 0]) &
+                        np.isfinite(pos_rel_group[:, 1]) &
+                        np.isfinite(pos_rel_group[:, 2]) &
+                        (np.abs(pos_rel_group[:, 0]) <= width) &
+                        (np.abs(pos_rel_group[:, 1]) <= width)
+                    )
+                else:
+                    mask = (
+                        np.isfinite(pos_rel_group[:, 0]) &
+                        np.isfinite(pos_rel_group[:, 1]) &
+                        np.isfinite(pos_rel_group[:, 2]) &
+                        (np.abs(pos_rel_group[:, 1]) <= width) &
+                        (np.abs(pos_rel_group[:, 2]) <= width)
+                    )
+
+                if np.sum(mask) == 0:
+                    continue
+
+                pos_rel_group = pos_rel_group[mask]
+                mass = mass[mask]
+                vel_rel_group = vel_rel_group[mask]
+
+                # subsample, se necessário
+                if len(pos_rel_group) > lenLim:
+                    idx = np.random.choice(np.arange(len(pos_rel_group)), size=lenLim, replace=False)
+                    pos_rel_group = pos_rel_group[idx]
+                    mass = mass[idx]
+                    vel_rel_group = vel_rel_group[idx]
+
+                all_pos.append(pos_rel_group)
+                all_mass.append(mass)
+
+                if Param not in [None, 'Mass']:
+                    if Param == 'SFR' and PartType == 'PartType0' and 'StarFormationRate' in file[PartType]:
+                        val = file[PartType]['StarFormationRate'][:][mask]
+                        if len(val) != len(mass):
+                            val = val[:len(mass)]
+                        if len(pos_rel_group) == len(val):
+                            all_value.append(val)
+
+                    elif Param == 'T' and PartType == 'PartType0' and 'InternalEnergy' in file[PartType] and 'ElectronAbundance' in file[PartType]:
+                        u = file['PartType0']['InternalEnergy'][:][mask]
+                        xe = file['PartType0']['ElectronAbundance'][:][mask]
+
+                        Xh = 0.76
+                        gamma = 5.0 / 3.0
+                        mp = 1.673e-24
+                        kb = 1.380658e-16
+                        mu = 4.0 / (1.0 + 3.0 * Xh + 4.0 * Xh * xe) * mp
+                        T = (gamma - 1.0) * (u / kb) * mu
+                        T = T * 1e10
+                        all_value.append(T)
+
+        except Exception as e:
+            logger.warning(f"Failed combining particles for ID_z0={ID}, snap={snap}: {e}")
+
+    if len(all_pos) == 0:
+        raise ValueError("No particles available to build combined group map.")
+
+    pos_all = np.vstack(all_pos)
+    mass_all = np.hstack(all_mass)
+
+    # mapa combinado
+    if Param in [None, 'Mass']:
+        qv = QuickView(
+            pos_all,
+            mass=mass_all if Param == 'Mass' else None,
+            plot=False,
+            r=r, t=t, x=0, y=0, z=0, p=prad,
+            extent=[-width, width, -width, width],
+            logscale=False
+        )
+        img = qv.get_image()
+        extent = qv.get_extent()
+
+    elif Param == 'SFR':
+        if len(all_value) == 0:
+            raise ValueError("No SFR data available for combined map.")
+
+        value_all = np.hstack(all_value)
+
+        qv_mass = QuickView(
+            pos_all, mass=mass_all, plot=False,
+            r=r, t=t, x=0, y=0, z=0, p=prad,
+            extent=[-width, width, -width, width], logscale=False
+        )
+        mfield = qv_mass.get_image()
+
+        qv_val = QuickView(
+            pos_all, mass=value_all, plot=False,
+            r=r, t=t, x=0, y=0, z=0, p=prad,
+            extent=[-width, width, -width, width], logscale=False
+        )
+        vfield = qv_val.get_image()
+
+        img = np.full_like(mfield, np.nan, dtype=float)
+        good = mfield > 0
+        img[good] = vfield[good] / mfield[good]
+        extent = qv_val.get_extent()
+
+    elif Param == 'T':
+        if len(all_value) == 0:
+            raise ValueError("No temperature data available for combined map.")
+
+        value_all = np.hstack(all_value)
+        img, extent = mass_weighted_map(pos_all, mass_all, value_all, r, t, prad, width)
+
+    else:
+        raise ValueError(f"Param={Param!r} not implemented yet in PlotGroupMapCombined")
+
+    panel_cmap, panel_vmin, panel_vmax, do_log = _panel_display_settings(
+        Param, PartType, cmap_dm, None, None
+    )
+
+    img_plot = _safe_log10_image(img) if do_log else np.where(np.isfinite(img), img, np.nan)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(
+        img_plot, extent=extent, origin='lower',
+        cmap=panel_cmap, vmin=panel_vmin, vmax=panel_vmax
+    )
+
+    # posições projetadas dos subhalos
+    if axis == 'z':
+        px = df['dx'].values
+        py = df['dy'].values
+        pvx = df['dvx'].values
+        pvy = df['dvy'].values
+    else:
+        px = df['dy'].values
+        py = df['dz'].values
+        pvx = df['dvy'].values
+        pvy = df['dvz'].values
+
+    inside = (
+        np.isfinite(px) & np.isfinite(py) &
+        (px >= -width) & (px <= width) &
+        (py >= -width) & (py <= width)
+    )
+
+    df_plot = df.loc[inside].copy()
+    px_plot = px[inside]
+    py_plot = py[inside]
+    pvx_plot = pvx[inside]
+    pvy_plot = pvy[inside]
+
+    mlog = df_plot['mtotal_logmsun'].values
+    if len(mlog) == 0:
+        sizes_plot = np.array([])
+    elif np.all(~np.isfinite(mlog)):
+        sizes_plot = np.full(len(df_plot), marker_scale)
+    else:
+        mmin = np.nanmin(mlog[np.isfinite(mlog)])
+        sizes_plot = marker_scale * (0.4 + (np.nan_to_num(mlog, nan=mmin) - mmin + 0.2))
+
+    ax.scatter(
+        px_plot, py_plot,
+        s=sizes_plot,
+        facecolor='none',
+        edgecolor='cyan',
+        linewidth=1.8,
+        zorder=5
+    )
+
+    if draw_rhalf:
+        for _, row in df_plot.iterrows():
+            rr = row['rhalf4'] if PartType == 'PartType4' else row['rhalf0']
+            if np.isfinite(rr) and rr > 0:
+                cx = row['dx'] if axis == 'z' else row['dy']
+                cy = row['dy'] if axis == 'z' else row['dz']
+
+                circ = plt.Circle(
+                    (cx, cy), rr,
+                    fill=False, color='lime', lw=1.2, alpha=0.8,
+                    zorder=4, clip_on=True
+                )
+                ax.add_patch(circ)
+
+    if show_velocity and len(px_plot) > 0:
+        ax.quiver(
+            px_plot, py_plot, pvx_plot, pvy_plot,
+            angles='xy', scale_units='xy', scale=20.0 / arrow_scale,
+            color='red', width=0.004, zorder=6
+        )
+
+    if annotate:
+        for _, row in df_plot.iterrows():
+            tx = row['dx'] if axis == 'z' else row['dy']
+            ty = row['dy'] if axis == 'z' else row['dz']
+
+            ax.text(
+                tx, ty, f"{int(row['ID_z0'])}",
+                color='white', fontsize=0.8 * fontlabel,
+                ha='left', va='bottom',
+                zorder=7, clip_on=True
+            )
+
+    ax.axhline(0, ls='--', lw=1, color='white', alpha=0.5)
+    ax.axvline(0, ls='--', lw=1, color='white', alpha=0.5)
+
+    ax.set_xlim(-width, width)
+    ax.set_ylim(-width, width)
+    ax.set_xlabel(xlabel, fontsize=fontlabel)
+    ax.set_ylabel(ylabel, fontsize=fontlabel)
+    ax.set_title(f'Combined group map | snap={snap}', fontsize=fontlabel)
+    ax.set_aspect('equal')
+    ax.tick_params(labelsize=0.95 * fontlabel)
+
+    plot.savefig(savepath, savefigname, False)
+
+    return df, fig, ax

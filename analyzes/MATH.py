@@ -8,7 +8,8 @@ Created on Wed Nov 30 2022
 """
 ###########################################################################
 ########################################################################### 
-
+import sys
+import os
 import numpy as np
 from sklearn.utils import resample
 from sklearn.linear_model import LinearRegression
@@ -17,6 +18,8 @@ from scipy.optimize import curve_fit
 from scipy.stats import ranksums
 from scipy.stats import median_test
 from scipy.stats import kstest
+
+sys.path.append(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
 import ExtractTNG
 
 from sklearn.metrics import mean_squared_error, r2_score
@@ -391,7 +394,6 @@ def Rotate(file, Rad, z = 0, TNG = False):
     source:
         Abhner Pinto de Almeida
     """
-
     #Positions, velocities, masses, cen and bulk velocity for each component
     
     pos = []
@@ -405,7 +407,7 @@ def Rotate(file, Rad, z = 0, TNG = False):
     h = 0.6778
     
     for TypeNum in range(6):
-        try:
+        if 'PartType'+str(int(TypeNum)) in file.keys():
             pos.append(file['PartType'+str(int(TypeNum))]['Coordinates'][:] * factor / h)
             vel.append(file['PartType'+str(int(TypeNum))]['Velocities'][:] * scalefactorsqrt)
             
@@ -421,13 +423,14 @@ def Rotate(file, Rad, z = 0, TNG = False):
 
                 
                 
-        except:
+        else:
             pos.append(np.array([0, 0, 0]))
             vel.append(np.array([0, 0, 0]))
             Cen.append(np.array([0, 0, 0]))
             VelBulk.append(np.array([0, 0, 0]))
             mass.append(np.array([0]))
             
+    print(mass)
     #Center and galay velocity
     CenGalaxy = np.sum(np.array([Cen[i] * np.sum(mass[i][:]) for i in range(6)]), axis = 0) / np.sum(np.array([np.sum(mass[i][:]) for i in range(6)]))
     VelGalaxy = np.sum(np.array([VelBulk[i] * np.sum(mass[i][:]) for i in range(6)]), axis = 0) / np.sum(np.array([np.sum(mass[i][:]) for i in range(6)]))

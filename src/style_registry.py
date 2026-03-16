@@ -556,6 +556,10 @@ BASE_titles = {
 
     'DontLoseTheirGasColorbar': 'Retain their gas',
     'LoseTheirGasColorbar': 'Lose their gas',
+    
+    'DontLoseTheirGas': 'Retain their gas',
+    'LoseTheirGas': 'Lose their gas',
+    
     'CentralColorbar': 'Central',
     
     
@@ -732,6 +736,8 @@ labels = {
     'sSFRTrueInner_BeforeEntry': r'$\log{(\overline{\mathrm{sSFR}}/\mathrm{yr^{-1}}})_{\mathrm{inner}}^{\mathrm{entry}}$',
     'sSFRTrueInner_Entry_to_Nogas': r'$\log{(\overline{\mathrm{sSFR}}/\mathrm{yr^{-1}}})_{\mathrm{inner}}^{\mathrm{entry-to-gas-loss}}$',
     'sSFRTrueRatio_Entry_to_Nogas':  r'$(\overline{\mathrm{sSFR}_\mathrm{inner}/\mathrm{sSFR}_{\mathrm{outer}}})^{\mathrm{entry-to-gas-loss}}$',
+
+    'sSFRRatioPericenter': r'$(\overline{\mathrm{sSFR}_\mathrm{After}} / \overline{\mathrm{sSFR}_\mathrm{Before}})^\mathrm{1st\,pericenter}_\mathrm{inner}$ ',
 
     
     #ExSitu

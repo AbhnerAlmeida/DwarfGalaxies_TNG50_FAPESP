@@ -80,7 +80,7 @@ except Exception as e:
 Omegam0 = 0.3089
 h = 0.6774
 
-plt.style.use("abhner.mplstyle")
+plt.style.use(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/src/abhner.mplstyle")
 
 #Paths
 SaveSubhaloPath = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/'
@@ -1710,7 +1710,7 @@ def PlotScatter(
             ax.axhline(0,color = 'black',linestyle='dashed',lw=2)
             
             ax.fill_between([0, 500], -500, 0, alpha=0.2, color='tab:green')  # yellow
-            ax.fill_between([-500, 0], 0, 500, alpha=0.2, color='tab:red')  # orange
+            ax.fill_between([-500, 0], -500, 0, alpha=0.2, color='tab:red')  # orange
             ax.fill_between([0, 500], 0, 500, alpha=0.2, color='tab:blue')  # red
             ax.text(-.145, -0.95, 'TS', fontsize = 0.98*fontlabel)
             ax.text(0.1, 0.02, 'SF', fontsize = 0.98*fontlabel)
