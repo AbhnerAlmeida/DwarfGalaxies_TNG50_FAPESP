@@ -1880,10 +1880,15 @@ def PlotScatter(
             if COLORBAR[0] == 'sSFRRatioPericenter':
                 cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.25, 0.5, 0.75, 1,  2], pad=0.02, aspect=(ratioColorbar or 50))
                 cb.ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1', '2'])
-            elif COLORBAR[0] == 'logStarZ_99':
+            elif COLORBAR[0]  in ["logStarZ_99"]:
                 cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.1, 0.2, 0.3, 0.7], pad=0.02, aspect=(ratioColorbar or 50))
 
                 cb.ax.set_yticklabels(['0', '0.1', '0.2', '0.3', '0.7'])
+                
+            elif COLORBAR[0]  in ["logStarZ_99_75dex"]:
+                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[-0.7, -0.6, -0.5, 0.], pad=0.02, aspect=(ratioColorbar or 50))
+
+                cb.ax.set_yticklabels(['-0.7', '-0.6', '-0.5', '0'])
                 
             else:
                 cb = fig.colorbar(mappable, ax=axs.ravel().tolist(), pad=0.02, aspect=(ratioColorbar or 50))

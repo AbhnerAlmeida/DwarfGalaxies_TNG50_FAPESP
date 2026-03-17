@@ -788,6 +788,7 @@ labels = {
     'Relative_logZ_At_Entry': r'$[\log Z_\star -\left<\log Z_\star\right>]^{\mathrm{entry}}$ ',
     'Relative_logInnerZ_At_Entry': r'$[\log Z_\star -\left<\log Z_\star\right>]^{\mathrm{entry}}_\mathrm{inner}$ ',
     'logStarZ_99': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
+    'logStarZ_99_75dex': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
 
 
     

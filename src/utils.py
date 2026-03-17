@@ -476,7 +476,7 @@ def _scatter_with_colorbar(
                 out[value > self.threshold] = 1.0
                 return out
 
-        if colorbar_key == "logStarZ_99":
+        if colorbar_key in ["logStarZ_99"]:
             norm_for_colorbar = ThresholdNormalize(vmin=0, vmax=0.6, threshold=0.3)
         else:
             norm_for_colorbar = ThresholdNormalize(vmin=-0.75, vmax=0.6 - 0.75, threshold=0.3 - 0.75)
@@ -485,9 +485,9 @@ def _scatter_with_colorbar(
             x, y, c=color_values,
             edgecolor=edgecolor,
             alpha=alpha_scatter,
-            lw=1.1 * linewidth if colorbar_key == "logStarZ_99" else 1.5 * linewidth,
+            lw=1.1 * linewidth if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"] else 1.5 * linewidth,
             marker=marker,
-            s=5 * size if colorbar_key == "logStarZ_99" else 7 * size,
+            s=5 * size if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"] else 7 * size,
             cmap=cmap, norm=norm_for_colorbar,
         )
 
