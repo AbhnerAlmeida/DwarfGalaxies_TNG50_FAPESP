@@ -162,6 +162,8 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
                 lw = 0
                 lwe = 1.5
 
+            elif 'Selected' in name:
+                lwe = 1.
                 
             else:
                 lw = lwe = 0
@@ -208,6 +210,29 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
             custom_lines.append(Line2D([0], [0], color=colors(name),
                                        ls= 'solid', lw=mult * 0.5* linesthicker(name), 
                                        dash_capstyle = capstyles(name)))
+            label.append(titles(name))
+            
+        elif 'Hist' in name:
+            name = name.replace('Hist', '')
+        
+            if 'Empty' in name:
+                name = name.replace('Empty', '')
+                custom_lines.append(
+                    Patch(
+                        facecolor='none',
+                        edgecolor=colors(name),
+                        linewidth=mult * 0.5 * linesthicker(name)
+                    )
+                )
+            else:
+                custom_lines.append(
+                    Patch(
+                        facecolor=colors(name),
+                        edgecolor=colors(name),
+                        linewidth=mult * 0.5 * linesthicker(name)
+                    )
+                )
+        
             label.append(titles(name))
         
         else:
@@ -1069,7 +1094,7 @@ def PlotMedianEvolution(
                         postiveXticks = np.append([-1, -0.5], postiveXticks)
                         postiveXLabels = np.append(["", "E"], postiveXLabels)
 
-                        ax.set_xlabel(r"$\phi_\mathrm{Orbital}$", fontsize=fontlabel)
+                        ax.set_xlabel(r"$\phi_\mathrm{orbital}$", fontsize=fontlabel)
                         ax.set_xticks(postiveXticks)
                         ax.set_xticklabels(postiveXLabels)
                         ax.set_xlim(-1, xPhaseLim + 0.5)
@@ -1121,7 +1146,7 @@ def PlotHist(
 
     # --- Limites e escalas ---
     xscale="linear", yscale="linear", xlimmin=None, xlimmax=None, ylimmin=None, ylimmax=None,
-    toplim=1e3,limaixsy=False, liminvalue=(0,), limax=(1,),
+    toplim=1e2,limaixsy=False, liminvalue=(0,), limax=(1,),
 
     # --- Texto / títulos / lookback ---
     title=False, xlabelintext=False, LookBackTime=False, Supertitle=False,
@@ -1275,6 +1300,23 @@ def PlotHist(
                     color=colors(name_key), ls=lines(name_key),
                     density=density, linewidth=linewidth)
             return
+        
+        if 'logStarZ_99' in param or 'logZ' in param:
+            bins_edges = np.linspace(-0.8, -0.45, 5)
+            bins_edges = np.append(bins_edges, np.linspace(-0.45, 0.1, 8))
+            bins_edges = np.unique(bins_edges)
+
+            ax.axvline(-0.45, c = 'black', ls = '--')
+            
+            if 'BadFlag' in name_key:
+                ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
+                    color=colors(name_key), ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            else:
+                ax.hist(v, bins=bins_edges, alpha=1, histtype='stepfilled',
+                    color='tab:green', ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            return
 
         # generic hist
         ax.hist(v, bins=binnumber, alpha=1, histtype='step',
@@ -1305,7 +1347,7 @@ def PlotHist(
             center = np.nanmedian(v_raw)
             ymax = 0.15
             ax.axvline(center, ymax=ymax, color=colors(name_key),
-                       ls=lines(name_key), linewidth=2.3 * linewidth)
+                       ls=lines(name_key), linewidth=2.3 * linewidth, zorder = 5)
             if medianPlot:
                 try:
                     xerr = MATH.boostrap_func(v_raw, num_boots=nboots)
@@ -1320,7 +1362,13 @@ def PlotHist(
     for i, row in enumerate(rows):
         for j, column in enumerate(columns):
             ax = axs[i, j]
+            
             titlename, param, panel = _panel_data(i, j)
+            
+            # if param == 'U-r':
+            #     NormalSatellite = TNG.extractPopulation('NormalSatelliteDMpoor', dfName = 'PaperII')
+            #     color_Normal = NormalSatellite['U-r'].values
+            #     _overlay_stat(ax, color_Normal, 'Normal', which= 'median')
 
             # plot each population
             for l, values_seq in enumerate(panel):
@@ -1366,6 +1414,8 @@ def PlotHist(
                         if isinstance(param, str) and ('Above1' in param) and (name_key == 'MBC'):
                             v_clean = _clean_values(np.where(v_clean == 0, np.nan, v_clean))
 
+                       
+                            
                         _plot_hist(ax, v_clean, name_key, param, binnumber)
 
                 # overlays
@@ -1475,6 +1525,10 @@ def PlotHist(
                     if xlimmin[j] == -0.05 and xlimmax[j] == 1.05:
                         ax.set_xticks([0, 0.5, 1])
                         ax.set_xticklabels(['0', '0.5', '1'])
+                        
+                # if 'logStarZ_99' in param or 'logZ_99' in param:
+                #     ax.set_yticks([10, 20, 30, 40, 50, 60, 70])
+                #     ax.set_yticklabels(['10', '20', '30', '40', '50', '60', '70'])
 
                 # One shared xlabel option
                 if JustOneXlabel:
@@ -1525,7 +1579,7 @@ def PlotScatter(
     bins=10, quantile=0.95, q=0.95, HIGHLIGHTPoints=False,
 
     # --- Layout ---
-    lNum=6, cNum=6, xscale = None, GridMake=False, InvertPlot=False, xlabelintext=False, title=False,
+    lNum=6, cNum=6, xscale = None, yscales = None, GridMake=False, InvertPlot=False, xlabelintext=False, title=False,
 
     # --- Helper lines ---
     EqualLine=False, EqualLineMin=None, EqualLineMax=None,
@@ -1719,7 +1773,8 @@ def PlotScatter(
         elif (ParamX == 'Relative_logInnerZ_At_Entry' and  (ParamsY[0] == 'Relative_logZ_At_Entry')) :
             xfitline  = np.linspace(0 ,1, 100)
             axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth)
-            
+            axs[i][j].plot( xfitline, np.zeros(100), ls='--', color='tab:red', linewidth=linewidth, zorder = 1)
+
         elif (ParamX == 'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry' and  (ParamsY[0] == 'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry')) :
 
             xfitline  = np.linspace(-6 ,2, 100)
@@ -1767,6 +1822,10 @@ def PlotScatter(
 
             x = np.linspace(0, 1)
             ax.plot( x, x, ls='--', color='tab:blue', linewidth=linewidth)
+            
+        elif  ('z_Birth' in ParamX  and ('DMFrac_Birth' in firstY) ) :
+
+            ax.axhline( 0.8, ls='--', color='tab:red', linewidth=linewidth)
 
         if ParamX == "AgeBorn":
             x = np.arange(14)
@@ -1780,9 +1839,7 @@ def PlotScatter(
         norm_local = None
     
         # Edgecolor logic (preserve original intent)
-        if "BadFlag" in name:
-            edcolor = "red"
-        elif NoneEdgeColor:
+        if NoneEdgeColor:
             edcolor = None
         else:
             edcolor = "black"
@@ -1829,19 +1886,26 @@ def PlotScatter(
                    color=colors(name),
                    edgecolor=edcolor,
                    alpha=alphaScater,
-                   lw=linesthicker(name),
+                   lw=0.6*linesthicker(name),
                    marker=markers(name),
                    s=msizet * msize(name))
         return None, None
 
-    def _apply_post_panel_formatting(ax, yparam):
+    def _apply_post_panel_formatting(ax, yparam, yscale = None):
         if GridMake:
             ax.grid(GridMake, color="#9e9e9e", which="major", linewidth=0.6, alpha=0.3, linestyle=":")
 
-        ax.set_yscale(scales(yparam))
+        if yscale != None:
+            ax.set_yscale(yscale)
+            
+            if yscale in ("log", "symlog"):
+                ax.yaxis.set_major_formatter(FuncFormatter(format_func_loglog))
 
-        if scales(yparam) in ("log", "symlog"):
-            ax.yaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+        else:
+            ax.set_yscale(scales(yparam))
+    
+            if scales(yparam) in ("log", "symlog"):
+                ax.yaxis.set_major_formatter(FuncFormatter(format_func_loglog))
 
     def _add_colorbar(fig, axs, sc, norm=None):
         """
@@ -1920,8 +1984,8 @@ def PlotScatter(
             ax = axs[i][j]
 
             # Special background rules (quadrants, guide lines, etc.)
+           
             _apply_special_background_rules(ax, ParamX, ParamsY[0], linewidth, fontlabel)
-
             # Background "All" layer
             if All is not None:
                 xAll = All[ParamX]
@@ -1992,7 +2056,7 @@ def PlotScatter(
                     ax.scatter(
                         np.nanmedian(x_plot), np.nanmedian(y_plot),
                         marker="*", edgecolor="black",
-                        c=colors(name), s=450, lw=1.5,
+                        c=colors(name), s=450, lw=1.5, zorder = 20
                     )
 
                 elif medianAll:
@@ -2027,7 +2091,14 @@ def PlotScatter(
                 ax.plot(xx, xx, ls="--", color="tab:blue", linewidth=linewidth)
 
             # Panel formatting
-            _apply_post_panel_formatting(ax, yparam)
+            if yscales != None:
+                yscale = yscales[i]
+            else:
+                yscale = None
+            _apply_post_panel_formatting(ax, yparam, yscale = yscale)
+            
+            if ylimmin is not None and ylimmax is not None:
+                ax.set_ylim(ylimmin[i], ylimmax[i])
 
             # Y label on first column
             if j == 0:
@@ -2035,7 +2106,9 @@ def PlotScatter(
                     ax.set_ylabel(labelsequal.get(yparam, yparam), fontsize=1.2 * fontlabel)
                 else:
                     ax.set_ylabel(labels.get(yparam, yparam), fontsize=1.2 * fontlabel)
+                    
                 ax.tick_params(axis="y", labelsize=0.99 * fontlabel)
+                
 
             # Title on first row
             if i == 0:
@@ -2047,23 +2120,46 @@ def PlotScatter(
                 if title:
                     ax.set_title(titles(title[j]), fontsize=1.1 * fontlabel)
 
+            if j == len(panel_columns) - 1:
+                if xlabelintext:
+                    Afont = {'color':  'black',
+                             'size': fontlabel,
+                             }
+                    anchored_text = AnchoredText(
+                        texts.get(yparam), loc='upper right', prop=Afont)
+                    ax.add_artist(anchored_text)
+                    
             # X label on last row
             if i == len(ParamsY) - 1:
-                if label_general:
+                if len(ParamsX) > 1 and label_general:
                     ax.set_xlabel(labelsequal.get(ParamsX[j], ParamsX[j]), fontsize=1.2 * fontlabel)
-                    ax.set_xscale(scales(ParamsX[j]))
-                    if scales(ParamsX[j]) in ("log", "symlog"):
+                    if  ParamsX[j] == 'z_Birth':
+                        ax.set_xscale('symlog',linthresh=0.05)
+                        ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
+                        ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
+                        
+                    else:
+                        ax.set_xscale(scales(ParamsX[j]))
+                    if scales(ParamsX[j]) in ("log", "symlog") and not ParamsX[j] == 'z_Birth':
                         ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+                
+                
                 else:
-                    ax.set_xlabel(labels.get(ParamX, ParamX), fontsize=1.2 * fontlabel)
+                    ax.set_xlabel(labels.get(ParamsX[0], ParamsX[0]), fontsize=1.2 * fontlabel)
                     if xscale != None:
                         ax.set_xscale(xscale)
                     else:
-                        ax.set_xscale(scales(ParamX))
-                    if xscale == None and scales(ParamX) in ("log", "symlog"):
+                        ax.set_xscale(scales(ParamsX[0]))
+                    if len(ParamsX) > 1 and ParamsX[j] == 'z_Birth':
+                        ax.set_xscale('symlog',linthresh=0.02)
+                        ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
+                        ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
+                        
+                    if xscale == None and scales(ParamX[0]) in ("log", "symlog") and not ParamsX[j] == 'z_Birth':
                         ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
                         
                 ax.tick_params(axis="x", labelsize=0.99 * fontlabel)
+                
                 
                 _apply_special_xaxis_rules(
                                             ax=ax,
@@ -2076,11 +2172,7 @@ def PlotScatter(
 
                 if xlimmin is not None and xlimmax is not None:
                     ax.set_xlim(xlimmin[i], xlimmax[i])
-                    
-                if ylimmin is not None and ylimmax is not None:
-                    ax.set_ylim(ylimmin[i], ylimmax[i])
 
-                
 
             # Legend at specific panel positions
             if legend and LegendNames is not None and legpositions is not None:
@@ -3198,7 +3290,7 @@ def PlotIDsAllTogether(
                             xticks = np.append([-1.0, -0.5], positive_ticks.astype(float))
                             xlabels = np.append(["", "E"], positive_labels)
 
-                            axs[i][j].set_xlabel(r"$\phi_\mathrm{Orbital}$", fontsize=fontlabel)
+                            axs[i][j].set_xlabel(r"$\phi_\mathrm{orbital}$", fontsize=fontlabel)
                             axs[i][j].set_xticks(xticks)
                             axs[i][j].set_xticklabels(xlabels)
                             axs[i][j].set_xlim(-1, xPhaseLim + 0.5)
@@ -4608,7 +4700,7 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                                 ['0', '2', '4', '6', '8', '10', '12', '14'])
 
                     elif PhasingPlot:
-                        axs[i][j].set_xlabel(r'$\phi_\mathrm{Orbital}$', fontsize=fontlabel)
+                        axs[i][j].set_xlabel(r'$\phi_\mathrm{orbital}$', fontsize=fontlabel)
                         axs[i][j].set_xticks([-1, -0.5, 0, 1, 2, 3, 4, 5] )
                         axs[i][j].set_xticklabels(['', 'E', '0', '1', '2', '3', '4', '5'])
                         axs[i][j].set_xlim(-1, 5.5)

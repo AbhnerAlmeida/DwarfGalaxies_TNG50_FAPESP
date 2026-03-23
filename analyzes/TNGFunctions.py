@@ -2836,11 +2836,16 @@ def extractPopulation(sample, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHisto
                 if 'NumPericenter'+str(numpericenters) in sample:
                     df = df.loc[(df.NumPericenter == 'NumPericenter'+str(numpericenters))]
         
+    if  'AllSB_TEST' in sample:
+        df = df.loc[(df.AllSB == 'AllSB_TEST')]
+        
+        
+        
     if  'BadFlag' in sample:
         df = df.loc[(df.Flags == 0)]
         
     
-    else:
+    elif not 'AllSB_TEST' in sample:
         df = df.loc[(df.Flags == 1)]
 
         if  'GMMIndex' in sample:

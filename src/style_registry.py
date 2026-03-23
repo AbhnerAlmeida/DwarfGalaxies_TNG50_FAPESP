@@ -50,6 +50,10 @@ def extract_NameBase(name: str) -> str:
         name = name.replace('Empty', '')
         specialcase = 'Empty'
         
+    elif 'Selected' in name:
+        name = name.replace('Selected', '')
+        specialcase = 'Selected'
+        
     elif 'Colorbar' in name:
         name = name.replace('Colorbar', '')
         specialcase = 'Colorbar'
@@ -99,6 +103,10 @@ def colors(name: str) :
     name, sidename, typename, specialcase, side_first = extract_NameBase(name)
     if specialcase in ('Empty', 'Colorbar'):
         return 'white'
+    
+    elif specialcase == 'Selected' and sidename == 'Satellite':
+        return 'black'
+    
     
     elif side_first:
         return BASE_colors.get(sidename, 'black')
@@ -238,14 +246,19 @@ BASE_colors = {
         'SBCBornYoung': 'lime',
 
         'TNGrage':  'gray',
+        'TNGAllrage':  'gray',
         'TNGrageCentral':  'gray',
 
         'Selected':  'none',
         'SatelliteSelected':  'black',
         
-        'BadFlag':  'none',
+        'BadFlag':  'red',
         'Satellite': 'none',
         'GMM': 'red',
+        
+        'AllSB_TEST': 'green',
+        'BadFlagAllSB_TEST':  'red',
+        'SBCSatelliteAllSB_TEST': 'tab:green',
         
 
         'SBCGamaColor': 'darkseagreen', 
@@ -323,7 +336,7 @@ BASE_edgecolors = {
         
         #Special classes
         
-        'BadFlag':  'red',
+        'BadFlag':  'black',
         'Central': 'black',        
         
 }
@@ -437,10 +450,12 @@ BASE_markers = {
 
     #Special classes
     'TNGrage': 'o',
+    'TNGAllrage': 'o',
     'TNGrageCentral':  'o',
 
     'Selected': 'o',
-    'BadFlag': '^',
+    'SatelliteSelected': 'o',
+    'BadFlag': 'o',
 
     'SBCGamaColor': 'D', 
     'MBCGamaColor': 'o', 
@@ -477,10 +492,11 @@ BASE_msize = {
    
     #Special classes
     'SBCBornYoung': 11,
-    'TNGrage':  3,
-    'TNGrageCentral':  3,
+    'TNGrage':  5,
+    'TNGAllrage': 5,
+    'TNGrageCentral':  5,
 
-    'BadFlag':  11,
+    'BadFlag':  5,
     'GAMAColor': 9.5, 
 
 
@@ -513,16 +529,21 @@ BASE_titles = {
     
     'Diffuse': r'Diffuse',
     'SubDiffuse': r'Sub-Diffuse',
-    
+    'SBsat': 'Satellites in SB',
     #Special classes
     
-    'TNGrage':  'All \n galaxies',
+    'TNGrage':  'Central galaxies',
+    'TNGAllrage': 'All galaxies',
     'TNGrageCentral':  'Central galaxies',
 
     'Selected':  'Selected',
+    'SatelliteSelected': 'Satellite',
     'Satellite':  'Satellite',
     'Central':  'Central',
     'BadFlag':  'Bad flags',
+    
+    'AllSB_TEST': 'All',
+    'BadFlagAllSB_TEST':  'Bad flags',
     'GMM': 'GMM',
 
     'SBCGamaColor': r'$\mathrm{Compacts_{SB}}$',
@@ -601,6 +622,8 @@ labelsequal = {
     #SUBHALO
     
     #Sizes
+    'logHalfRadstar_99': r'$\log(r_{1/2, \, z = 0}/\mathrm{kpc})$',
+
     'SubhaloHalfmassRadType0': r'$\log(r_{1/2}/\mathrm{kpc})$',  
     'SubhaloHalfmassRadType1': r'$\log(r_{1/2}/\mathrm{kpc})$',  
     'SubhaloHalfmassRadType4': r'$\log(r_{1/2}/\mathrm{kpc})$',  
@@ -632,6 +655,8 @@ labelsequal = {
     'sSFR_Above_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFR_In_TrueRhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFR_Above_TrueRhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
+    
+    'SubhalosSFR': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
 
     #ExSitu
     'MassExNormalize': r'Normalized $M_\mathrm{ex-situ}$',
@@ -643,6 +668,14 @@ labelsequal = {
     'ExMassType0Evolution': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
     'ExMassType1Evolution': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
     'ExMassType4Evolution': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
+    
+    'RadIn': r'$\overline{r}_\mathrm{in-situ} [\mathrm{kpc}]$',
+    'RadEx': r'$\overline{r}_\mathrm{ex-situ}  [\mathrm{kpc}]$',
+    'SigmaIn': r'$\sigma_\mathrm{v, in-situ}  [\mathrm{km\, s}^{-1}]$',
+    
+    'logSUM_Mstar_merger_Corotate' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
+    'logSUM_Mstar_merger_Perpendicular' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
+    'logSUM_Mstar_merger_Counterotating' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
     
     #Group
     'GroupNsubsFinalGroup': r'Number of satellites',
@@ -670,7 +703,20 @@ labelsequal = {
     
     'Decrease_Entry_To_NoGas_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{entry}  \Delta t))^\mathrm{entry-to-gas-loss}\, \mathrm{[Gyr^{-1}]}$',
     'Decrease_NoGas_To_Final_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{no-gas}  \Delta t))^\mathrm{no-gas}\, \mathrm{[Gyr^{-1}]}$', 
-   
+    'l200': r'$\lambda_{200}$',
+    
+    'l200_NewMeanAfter1Gyr': r'$\lambda_{200}$',
+    'l200_NewMeanAfter5Gyr': r'$\lambda_{200}$',
+    'l200_NewMeanAfter8Gyr': r'$\lambda_{200}$',
+
+    'l200_New_at_99': r'$\lambda_{200}$',
+    
+    'CumulativeCorotateFraction_at_1': r'$f_{\mathrm{acc,\, Corotate}}$',
+    'CumulativeCorotateFraction_at_5': r'$f_{\mathrm{acc,\, Corotate}}$',
+    'CumulativeCorotateFraction_at_8': r'$f_{\mathrm{acc,\, Corotate}}$',
+
+    'CumulativeCorotateFraction': r'$f_{\mathrm{acc,\, Corotate}}$',
+
 
     }
 
@@ -683,6 +729,8 @@ labels = {
     #SUBHALO
     
     #Sizes
+    'logHalfRadstar_99': r'$\log(r_{1/2, \, z = 0}/\mathrm{kpc})$',
+
     'SubhaloHalfmassRadType0': r'$\log(r_{1/2, \mathrm{gas}}/\mathrm{kpc})$',
     'SubhaloHalfmassRadType1': r'$\log(r_{1/2, \mathrm{DM}}/\mathrm{kpc})$',
     'SubhaloHalfmassRadType4': r'$\log(r_{1/2, \star}/\mathrm{kpc})$',
@@ -739,6 +787,7 @@ labels = {
 
     'sSFRRatioPericenter': r'$(\overline{\mathrm{sSFR}_\mathrm{After}} / \overline{\mathrm{sSFR}_\mathrm{Before}})^\mathrm{1st\,pericenter}_\mathrm{inner}$ ',
 
+    'SubhalosSFR': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     
     #ExSitu
     'MassExNormalize': r'$(M_{\mathrm{ex-situ}} / M_{\mathrm{ex-situ},\; z = 0})$',
@@ -750,6 +799,14 @@ labels = {
     'ExMassType0Evolution': r'$\log(M_{\mathrm{gas, \; ex-situ}}/\mathrm{M}_\odot)$',
     'ExMassType1Evolution': r'$\log(M_{\mathrm{DM, \; ex-situ}}/\mathrm{M}_\odot)$',
     'ExMassType4Evolution': r'$\log(M_{\mathrm{\star, \; ex-situ}}/\mathrm{M}_\odot)$',
+    
+    'RadIn': r'$\overline{r}_\mathrm{in-situ} [\mathrm{kpc}]$',
+    'RadEx': r'$\overline{r}_\mathrm{ex-situ}  [\mathrm{kpc}]$',
+    'SigmaIn': r'$\sigma_\mathrm{v, in-situ}  [\mathrm{km\, s}^{-1}]$',
+    
+    'logSUM_Mstar_merger_Corotate' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
+    'logSUM_Mstar_merger_Perpendicular' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
+    'logSUM_Mstar_merger_Counterotating' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
 
     #Group
     'GroupNsubsFinalGroup': 'Number of satellites \n Final host',
@@ -789,6 +846,19 @@ labels = {
     'Relative_logInnerZ_At_Entry': r'$[\log Z_\star -\left<\log Z_\star\right>]^{\mathrm{entry}}_\mathrm{inner}$ ',
     'logStarZ_99': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
     'logStarZ_99_75dex': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
+    'l200': r'$\lambda_{200}$',
+    
+    'l200_NewMeanAfter1Gyr': r'$\lambda_{200}$',
+    'l200_NewMeanAfter5Gyr': r'$\lambda_{200}$',
+    'l200_NewMeanAfter8Gyr': r'$\lambda_{200}$',
+
+    'l200_New_at_99': r'$\lambda_{200}$',
+    
+    'CumulativeCorotateFraction_at_1': r'$f_{\mathrm{acc,\, Corotate}}$',
+    'CumulativeCorotateFraction_at_5': r'$f_{\mathrm{acc,\, Corotate}}$',
+    'CumulativeCorotateFraction_at_8': r'$f_{\mathrm{acc,\, Corotate}}$',
+
+    'CumulativeCorotateFraction': r'$f_{\mathrm{acc,\, Corotate}}$',
 
 
     
@@ -837,5 +907,11 @@ texts = {
     #AngularMomentum
     'MassTensorEigenVals': r'$\mu_1 / \sqrt{\mu_2 \mu_3}$',
     'logjProfile': r'$\log (j_{\mathrm{gas}} / \, \, [\mathrm{kpc \; km  \; s^{-1}}])$',
+    
+    'l200_NewMeanAfter1Gyr': r'$z = 5.5$', #r'$1$ Gyr after birth',
+    'l200_NewMeanAfter5Gyr': r'$z = 1.2$', #r'$5$ Gyr after birth',
+    'l200_NewMeanAfter8Gyr': r'$z = 0.6$', # r'$8$ Gyr after birth',
+    'l200_New_at_99': r'$z = 0$', # r'$8$ Gyr after birth',
+
 
     }
