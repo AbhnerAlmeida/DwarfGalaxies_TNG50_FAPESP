@@ -1,0 +1,2 @@
+dm_retained_low,dm_retained_high,rmin_low,rmin_high,zentry_high,zentry_low,sample_class
+0.08,0.6,0.1,0.6,1.0,0.35,Normals

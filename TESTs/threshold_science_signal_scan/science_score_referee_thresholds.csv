@@ -1,0 +1,10 @@
+sample_class,threshold,n_signals_recovered,n_signals_total,frac_signals_recovered,Npoor,Nrich,Nmin,size_penalty,science_score
+CompactsMB,0.5,1,5,0.2,15,68,15,0.6666666666666666,0.13333333333333333
+CompactsMB,0.7,4,5,0.8,54,29,29,1.0,0.8
+CompactsMB,0.8,4,5,0.8,59,24,24,1.0,0.8
+CompactsSB,0.5,4,5,0.8,10,47,10,0.3333333333333333,0.26666666666666666
+CompactsSB,0.7,3,5,0.6,16,41,16,0.7333333333333333,0.43999999999999995
+CompactsSB,0.8,3,5,0.6,23,34,23,1.0,0.6
+Normals,0.5,0,5,0.0,0,611,0,0.0,0.0
+Normals,0.7,0,5,0.0,8,603,8,0.2,0.0
+Normals,0.8,2,5,0.4,51,560,51,1.0,0.4

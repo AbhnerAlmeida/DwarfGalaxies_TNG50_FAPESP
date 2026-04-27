@@ -1,0 +1,10 @@
+sample_class,threshold,Npoor,Nrich,Ncentral,central_likeness_score,n_positive_variables,n_variables_evaluated
+Normals,0.5,0,611,0,,0,0
+Normals,0.7,8,603,0,,0,0
+Normals,0.8,51,560,0,,0,0
+CompactsMB,0.5,15,68,0,,0,0
+CompactsMB,0.7,54,29,0,,0,0
+CompactsMB,0.8,59,24,0,,0,0
+CompactsSB,0.5,10,47,0,,0,0
+CompactsSB,0.7,16,41,0,,0,0
+CompactsSB,0.8,23,34,0,,0,0
