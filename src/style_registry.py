@@ -122,6 +122,11 @@ def edgecolors(name: str) :
     if specialcase in ('Empty', 'Colorbar'):
         if side_first:
             return BASE_edgecolors.get(sidename, 'black')
+        
+        if sidename == None:
+            return BASE_edgecolors.get(name, 'black')
+        elif 'LoseTheirGas' in sidename:
+            return BASE_edgecolors.get(sidename, 'k')
     
         else:
             return BASE_edgecolors.get(name, 'black')
@@ -138,6 +143,8 @@ def lines(name: str) :
     if sidename == None:
         return BASE_lines.get(name, 'solid')
 
+    elif 'LoseTheirGas' in sidename:
+        return BASE_lines.get(sidename, 'solid')
     
     return BASE_lines.get(sidename, 'solid')
 
@@ -167,8 +174,6 @@ def markers(name: str) :
             if sidename == None:
                 return BASE_markers.get(name+'Colorbar', 'o')
 
-            elif 'LoseTheirGas' in sidename:
-                return BASE_markers.get(sidename+'Colorbar', 'o')
             else:
                 return BASE_markers.get(name+'Colorbar', 'o')
 
@@ -234,6 +239,8 @@ def titles(name: str) :
 BASE_colors = {
         #Size classes
         'Normal': 'darkorange',
+        'NormalDif': 'darkorange',
+
         'SBC': 'forestgreen',
         'MBC': 'royalblue',
         
@@ -244,6 +251,9 @@ BASE_colors = {
         
         #Special classes
         'SBCBornYoung': 'lime',
+        
+        'BornYoungSystems': 'white',
+
 
         'TNGrage':  'gray',
         'TNGAllrage':  'gray',
@@ -271,6 +281,9 @@ BASE_colors = {
         'SatelliteNotInteract':  'blue',
         'SatelliteInteract':  'red',
         'Central':  'black',
+        
+        'LoseTheirGas': 'white',
+        'DontLoseTheirGas': 'white',
 
         #Error
         'NormalError': 'tab:orange',
@@ -326,6 +339,8 @@ BASE_edgecolors = {
     
         #Size classes
         'Normal': 'darkorange',
+        'NormalDif': 'darkorange',
+
         'SBC': 'forestgreen',
         'MBC': 'royalblue',
         
@@ -333,6 +348,12 @@ BASE_edgecolors = {
         'SubDiffuse': '#8c6bb1',
         'Compact': 'forestgreen',
         'SubCompact': 'royalblue',
+        
+        'BornYoungSystems': 'red',
+        
+        'LoseTheirGas': 'k',
+        'DontLoseTheirGas': 'k',
+
         
         #Special classes
         
@@ -352,12 +373,18 @@ BASE_lines = {
         'WithoutBH': (0, (10, 8)),
         'WithBH': 'solid',
         
+        'LoseTheirGas': 'solid',
+        'DontLoseTheirGas': 'dashed',
+
         #EVOLUTION
         
         'Type0': (0, (10, 8)),
         'Type1': (0,(0.1,2)),
         'Type4': 'solid',
         
+        'Mbar_Norm_Max': 'solid',
+        'Mgas_Norm_Max': (0, (10, 8)),
+
         #Evolution
         
         'MassExNormalize': 'solid',
@@ -386,10 +413,11 @@ BASE_scales = {
     'Mgas_Norm_Max':   'log',
     'MDM_Norm_Max':   'log',
     'Mstar_Norm_Max':  'log',
+    'Mbar_Norm_Max':  'log',
     
     'GasFrac_99': 'log',
     'StarFrac_99': 'log',
-    'DMFrac_99': 'log',
+    'DMFrac_99': 'linear',
     
     'MDM_Norm_Max_99': 'log',
     
@@ -419,6 +447,12 @@ BASE_scales = {
 
 BASE_linesthicker = {
         
+        'Normal': 1.1,
+        'NormalDif': 1.1,
+
+        'SBC': 1.1,
+        'MBC': 1.1,
+        
         'SatelliteDMrich': 1.,
         'SatelliteDMpoor': 1.,
         'Central':  0.8,
@@ -436,11 +470,14 @@ BASE_linesthicker = {
         'sSFR_In_TrueRhpkpc': 0.8,
         'sSFR_Above_TrueRhpkpc': 0.8,
         
+        
 }
 
 BASE_markers = {
     #Size classes
     'Normal': 'o',
+    'NormalDif': 'o',
+
     'SBC': 'o',
     'MBC': 'o',
     
@@ -452,6 +489,9 @@ BASE_markers = {
     'TNGrage': 'o',
     'TNGAllrage': 'o',
     'TNGrageCentral':  'o',
+    
+    'BornYoungSystems': 'o',
+
 
     'Selected': 'o',
     'SatelliteSelected': 'o',
@@ -467,14 +507,14 @@ BASE_markers = {
     'SBCColorbar': 'D',
     'MBCColorbar': 'o',
     
-    'DontLoseTheirGasColorbar': '*',
-    'LoseTheirGasColorbar': 's',
+    'DontLoseTheirGasColorbar': 'o',
+    'LoseTheirGasColorbar': 'o',
     
-    'DontLoseTheirGas': '*',
-    'LoseTheirGas': 's',
+    'DontLoseTheirGas': 'o',
+    'LoseTheirGas': 'o',
     
     'SubDiffuseColorbar': 'H',
-    'DiffuseColorbar': 'D',
+    'DiffuseColorbar': 's',
 
     'GAMAColorbar': '*', 
     
@@ -489,30 +529,33 @@ BASE_markers = {
 BASE_msize = {
     #Size classes
     'Normal': 3.3,
-   
+    'NormalDif': 3.3,
+
     #Special classes
     'SBCBornYoung': 11,
     'TNGrage':  5,
     'TNGAllrage': 5,
     'TNGrageCentral':  5,
+    
+
 
     'BadFlag':  5,
     'GAMAColor': 9.5, 
 
 
     #Colorbar
-    'NormalColorbar': 6,
+    'NormalColorbar': 8,
     'SubDiffuseColorbar': 8,
     'GAMAColorbar': 9.5, 
     
     'SatelliteDontLoseTheirGasColorbar': 36,
     'SatelliteLoseTheirGasColorbar': 12,
     
-    'DontLoseTheirGasColorbar': 12,
-    'LoseTheirGasColorbar': 8,
+    # 'DontLoseTheirGasColorbar': 12,
+    # 'LoseTheirGasColorbar': 8,
     
-    'DontLoseTheirGas': 12,
-    'LoseTheirGas': 8,
+    # 'DontLoseTheirGas': 12,
+    # 'LoseTheirGas': 8,
     
 
 }
@@ -531,6 +574,9 @@ BASE_titles = {
     'SubDiffuse': r'Sub-Diffuse',
     'SBsat': 'Satellites in SB',
     #Special classes
+    
+    'BornYoungSystems': 'Young subhalos',
+
     
     'TNGrage':  'Central galaxies',
     'TNGAllrage': 'All galaxies',
@@ -601,6 +647,9 @@ BASE_titles = {
     'sSFR_In_TrueRhpkpc': r'$r <  r_{1/2,\; z=0}$',
     'sSFR_Above_TrueRhpkpc': r'$r > r_{1/2,\; z=0}$',
     
+    'Mbar_Norm_Max': '$M_\star + M_\mathrm{gas}$',
+    'Mgas_Norm_Max': '$M_\mathrm{gas}$',
+    
     #SPECIAL
     'Type0': 'Gas',
     'Type1': 'DM',
@@ -641,6 +690,8 @@ labelsequal = {
     'Mgas_Norm_Max':r'$M/ M_\mathrm{max}$',
     'MDM_Norm_Max': r'$M/ M_\mathrm{max}$',
     'Mstar_Norm_Max': r'$M/ M_\mathrm{max}$',
+    'Mbar_Norm_Max': r'$M/ M_\mathrm{max}$',
+
     
     'GasMass_In_Rhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
     'GasMass_Above_Rhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
@@ -650,7 +701,8 @@ labelsequal = {
     #SFR
     'SubhalosSFRInHalfRad': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFRCoreRatio': r'$\mathrm{sSFR} / \mathrm{sSFR}}$',
-    
+    'sSFR_Ratio_07_5_pkpc': r'$\mathrm{sSFR}_{r < 0.7  \, \mathrm{kpc}} / \mathrm{sSFR}_{r < 5 \,  \mathrm{kpc}}}$',
+    'sSFR_Ratio_05_2p5_pkpc': r'$\mathrm{sSFR}_{r < 0.5  \, \mathrm{kpc}} / \mathrm{sSFR}_{r < 2.5 \,  \mathrm{kpc}}$',
     'sSFR_In_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFR_Above_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFR_In_TrueRhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
@@ -703,6 +755,12 @@ labelsequal = {
     
     'Decrease_Entry_To_NoGas_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{entry}  \Delta t))^\mathrm{entry-to-gas-loss}\, \mathrm{[Gyr^{-1}]}$',
     'Decrease_NoGas_To_Final_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{no-gas}  \Delta t))^\mathrm{no-gas}\, \mathrm{[Gyr^{-1}]}$', 
+    
+    'Decrease_Entry_To_NoGas': r'$(\Delta r_{1/2} / r_{1/2}^\mathrm{entry} )^\mathrm{entry-to-gas-loss}$',
+    'Decrease_NoGas_To_Final': r'$(\Delta r_{1/2} / r_{1/2}^\mathrm{entry} )^\mathrm{no-gas}$',
+    
+    'dt_Entry_To_NoGas_Gyr': r'$(\Delta t)$^\mathrm{entry-to-gas-loss}',
+    
     'l200': r'$\lambda_{200}$',
     
     'l200_NewMeanAfter1Gyr': r'$\lambda_{200}$',
@@ -733,11 +791,11 @@ labels = {
 
     'SubhaloHalfmassRadType0': r'$\log(r_{1/2, \mathrm{gas}}/\mathrm{kpc})$',
     'SubhaloHalfmassRadType1': r'$\log(r_{1/2, \mathrm{DM}}/\mathrm{kpc})$',
-    'SubhaloHalfmassRadType4': r'$\log(r_{1/2, \star}/\mathrm{kpc})$',
+    'SubhaloHalfmassRadType4': r'$\log(r_{1/2}/\mathrm{kpc})$',
     
     'deltaSize_at_Entry':  r'$[(r_{{1/2}} -\left<r_{{1/2}}\right>) / \sigma_{r_{{1/2}}}]^{\mathrm{entry}}$ ',
     
-    'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{sf}} - r_{1/2, z_\mathrm{entry}})/  r_{1/2, z_\mathrm{entry}}$',
+    'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{isp}} - r_{1/2, z_\mathrm{entry}})/  r_{1/2, z_\mathrm{entry}}$',
     'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{ts}} - r_{1/2, z_\mathrm{entry}}) / r_{1/2, z_\mathrm{entry}}$',
 
 
@@ -753,10 +811,11 @@ labels = {
     'Mgas_Norm_Max':r'$(M/M_\mathrm{max})_\mathrm{gas}$',
     'MDM_Norm_Max': r'$(M/ M_\mathrm{max})_\mathrm{DM}$',
     'Mstar_Norm_Max': r'$(M/ M_\mathrm{max})_\star$',
-    
+    'Mbar_Norm_Max': r'$(M/ M_\mathrm{max})_\mathrm{bar}$',
+
     'GasFrac_99': r'$(M_\mathrm{gas}/ M)_{z = 0}$',
     'StarFrac_99': r'$(M_\star/ M)_{z = 0}$',
-    'DMFrac_99': r'$(M_\mathrm{DM}/ M)_{z = 0}$',
+    'DMFrac_99': r'$f_{\rm DM,\,z=0}$',
     
     'MassIn_Infall_to_GasLost': r'$(\Delta M_\star)_{\mathrm{inner}}^\mathrm{entry-to-gas-loss} / M_\star^\mathrm{entry}$', #'Relative inner stellar mass \n change during period', #
     'MassAboveAfterInfall_Lost': r'$(\Delta M_\star)_{\mathrm{outer}} ^\mathrm{no-gas} / M_{\star}^{\mathrm{gas-loss}}$', #r'$(\Delta M_\star)_{r > r_{1/2, z = 0},  M_\mathrm{gas, \, min} \mathrm{\, to \,} z = 0} / M_{\star, M_\mathrm{gas, \, min} }$',
@@ -773,7 +832,9 @@ labels = {
     #SFR
     'SubhalosSFRInHalfRad': r'$\log(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr}^{-1})$',
     'sSFRCoreRatio': r'$\mathrm{sSFR}_{r < r_{1/2}} / \mathrm{sSFR}_{r > r_{1/2}}$',
-    
+    'sSFR_Ratio_07_5_pkpc': r'$\mathrm{sSFR}_{r < 0.7 \, \mathrm{kpc}} / \mathrm{sSFR}_{r < 5 \, \mathrm{kpc}}$',
+    'sSFR_Ratio_05_2p5_pkpc': r'$\mathrm{sSFR}_{r < 0.5  \mathrm{\,kpc}} / \mathrm{sSFR}_{r < 2.5 \mathrm{\,kpc}}$',
+
     'sSFRinHalfRadAfterz5': r'$\overline{\log{(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr^{-1}})}}_{z < 5}$',
 
     'sSFR_In_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
@@ -792,6 +853,11 @@ labels = {
     #ExSitu
     'MassExNormalize': r'$(M_{\mathrm{ex-situ}} / M_{\mathrm{ex-situ},\; z = 0})$',
     'MassExNormalizeAll': r'$(M_{\mathrm{ex-situ}} / M_{\star,\; z = 0})$',
+    
+    'Frac_ExSitu': r'$(M_{\mathrm{ex-situ}} / M_{\star})$',
+    
+    'StellarMassExSitu': r'$\log(M_{\mathrm{ex-situ,\; merger}}/\mathrm{M}_\odot)$',
+
     'StellarMassExSituMinor': r'$\log(M_{\mathrm{ex-situ,\; minor\; merger}}/\mathrm{M}_\odot)$',
     'StellarMassExSituIntermediate': r'$\log(M_{\mathrm{ex-situ,\; intermediate\; merger}}/\mathrm{M}_\odot)$',
     'StellarMassExSituMajor': r'$\log(M_{\mathrm{ex-situ,\; major\; merger}}/\mathrm{M}_\odot)$',
@@ -832,16 +898,28 @@ labels = {
     'LBTimeIntermediateMerger': 'Lookback time \n Intermediate Merger [Gyr]',
     
     'z_At_FinalEntry':  r'$z_{\mathrm{infall}}$ in final host',
-    'z_At_FirstEntry':  r'$z_{\mathrm{infall}}$ in first host',
+    'z_At_FirstEntry':  r'$z_{\rm entry} \, \mathrm{(first\ host)}$',
     'SnapLostGas': 'Gas loss lookback time  [Gyr]', #$M_\mathrm{gas} = 0$',
 
     'z_Birth': r'$z_\mathrm{birth}$',
 
     #Others
     'U-r': r'$u-r \; [\mathrm{mag}]$',
+    'ratio_color_U_minus_r_0p5xRh': r'$[u-r]_\mathrm{inner} - [u-r]_\mathrm{outer} $',
+    'ratio_color_U_minus_r_1xRh': r'$[u-r]_\mathrm{inner} - [u-r]_\mathrm{outer} $',
+    'inner_color_U_minus_r_1xRh': r'$[u-r]_\mathrm{inner}$',
+    'outer_color_U_minus_r_1xRh': r'$[u-r]_\mathrm{outer}$',
+    'global_color_U_minus_r_1xRh': r'$[u-r]_\mathrm{global}$',
+
     'Decrease_Entry_To_NoGas_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{entry}  \Delta t))^\mathrm{entry-to-gas-loss}\, \mathrm{[Gyr^{-1}]}$',
     'Decrease_NoGas_To_Final_Norm_Delta': r'$(\Delta r_{1/2} / (r_{1/2}^\mathrm{no-gas}  \Delta t))^\mathrm{no-gas}\, \mathrm{[Gyr^{-1}]}$', 
    
+    'Decrease_Entry_To_NoGas': r'$(\Delta r_{1/2} / r_{1/2}^\mathrm{entry} )^\mathrm{entry-to-gas-loss}$',
+    'Decrease_NoGas_To_Final': r'$(\Delta r_{1/2} / r_{1/2}^\mathrm{entry} )^\mathrm{no-gas}$',
+    
+    'dt_Entry_To_NoGas_Gyr': r'$(\Delta t)^\mathrm{entry-to-gas-loss}$',
+    'dt_NoGas_OVER_dt_EntryToGasLoss': r'$(\Delta t)^\mathrm{no-gas} / (\Delta t)^\mathrm{entry-to-gas-loss} $',
+
     'Relative_logZ_At_Entry': r'$[\log Z_\star -\left<\log Z_\star\right>]^{\mathrm{entry}}$ ',
     'Relative_logInnerZ_At_Entry': r'$[\log Z_\star -\left<\log Z_\star\right>]^{\mathrm{entry}}_\mathrm{inner}$ ',
     'logStarZ_99': r'$\log( Z_\star / Z_\odot)_{z = 0}$',

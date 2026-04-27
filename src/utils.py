@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 import warnings
 
-from style_registry import (markers, msize, colors, edgecolors)
+from style_registry import (markers, msize, edgecolors, lines)
 
 from matplotlib.collections import LineCollection
 
@@ -197,18 +197,37 @@ def _scatter_with_colorbar(
                         cmap=cmap, norm=norm_for_colorbar)
         return sc, norm_for_colorbar
 
-    if colorbar_key == "MDM_Norm_Max_99":
-        norm_for_colorbar = mpl.colors.LogNorm(vmin=0.005, vmax=0.2)
-        sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolor,
-                        alpha=alpha_scatter, lw=1.1 * linewidth, marker=marker, s=5 * size,
-                        cmap=cmap, norm=norm_for_colorbar)
-        return sc, norm_for_colorbar
+   
 
     if colorbar_key == "z_At_FirstEntry":
-        norm_for_colorbar = mpl.colors.LogNorm(vmin=0.2, vmax=3)
-        sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolors.get(names_l, None),
-                        alpha=alpha_scatter, lw=lw, marker=marker, s=size,
-                        cmap=cmap, norm=norm_for_colorbar)
+        # 3 discrete redshift bins
+        z_bins = [0.0, 0.4, 0.8, 5]
+    
+        # pick 3 clearly separated colors from the chosen cmap
+        cmap_discrete = mpl.colors.ListedColormap([
+            cmap(0.05),  # late entry
+            cmap(0.50),  # intermediate
+            cmap(0.95),  # early entry
+        ])
+        
+    
+        norm_for_colorbar = mpl.colors.BoundaryNorm(
+            boundaries=z_bins,
+            ncolors=cmap_discrete.N,
+            clip=True
+        )
+    
+        sc = ax.scatter(
+            x, y,
+            c=color_values,
+            edgecolor=edgecolors(names_l + "Colorbar"),  # simpler and clearer than varying edge colors
+            alpha=alpha_scatter,
+            lw=0.6 * lw,
+            marker=marker,
+            s=size,
+            cmap=cmap_discrete,
+            norm=norm_for_colorbar
+        )
         return sc, norm_for_colorbar
 
     if colorbar_key == "deltaInnersSFR_afterEntry_all_EntryRh":
@@ -216,6 +235,13 @@ def _scatter_with_colorbar(
         sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolor,
                         alpha=alpha_scatter, lw=lw, marker=marker, s=7 * size,
                         cmap=cmap, norm=norm_for_colorbar)
+        return sc, norm_for_colorbar
+
+    if colorbar_key == "dt_NoGas_OVER_dt_EntryToGasLoss":
+        norm_for_colorbar = mpl.colors.LogNorm(vmin=0.07, vmax=10)
+        sc = ax.scatter(x, y, c=color_values, edgecolor='k',
+                        alpha=alpha_scatter, lw=0.9 * linewidth, marker=marker, s= size,
+                        cmap=cmap,norm=norm_for_colorbar)
         return sc, norm_for_colorbar
 
     # ---- 3) Fixed discrete cmap cases ----
@@ -343,19 +369,14 @@ def _scatter_with_colorbar(
                         cmap=cmap, vmin=-1.2, vmax=0.3)
         return sc, norm_for_colorbar
 
-    if colorbar_key == "MassAboveAfterInfall_Lost":
-        sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolors(names_l + "Colorbar"),
-                        alpha=alpha_scatter, lw=1.1 * linewidth, marker=marker, s=size,
-                        cmap=cmap, vmin=-0.66, vmax=0.0)
- 
-        return sc, norm_for_colorbar
-
+    
     if colorbar_key == "TimeLossGass":
         sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolor,
                         alpha=alpha_scatter, lw=lw, marker=marker, s=7 * size,
                         cmap=cmap, vmin=0, vmax=12)
         return sc, norm_for_colorbar
-
+    
+    
     if colorbar_key == "StarMass_GasLoss_Over_EntryToGas":
         sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolor,
                         alpha=alpha_scatter, lw=lw, marker=marker, s=7 * size,
@@ -399,10 +420,26 @@ def _scatter_with_colorbar(
         return sc, norm_for_colorbar
 
     if colorbar_key == "SnapLostGas":
-        sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolors(names_l + "Colorbar"),
-                        alpha=alpha_scatter, lw=1.1 * linewidth, marker=marker, s=size,
+        sc = ax.scatter(x, y, c=color_values, edgecolor='k',
+                        alpha=alpha_scatter, lw=0.9, marker=marker, s=size,
                         cmap=cmap, vmin=0, vmax=14)
         return sc, norm_for_colorbar
+    
+    if colorbar_key == "MassAboveAfterInfall_Lost":
+        sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolors(names_l),
+                        alpha=alpha_scatter, lw=0.9, marker=marker, s=size,
+                        cmap=cmap, vmin=-0.66, vmax=0.0)
+ 
+        return sc, norm_for_colorbar
+
+    
+    if colorbar_key == "dt_Entry_To_NoGas_Gyr":
+        sc = ax.scatter(x, y, c=color_values, edgecolor='k',
+                        alpha=alpha_scatter, lw=0.9 * linewidth, marker=marker, s= size,
+                        cmap=cmap, vmin=0, vmax=8)
+        return sc, norm_for_colorbar
+
+    
 
     if colorbar_key == "deltaRatio_gastoend_entrytogas":
         sc = ax.scatter(x, y, c=color_values, edgecolor=edgecolors(names_l + "Colorbar"),
@@ -437,66 +474,119 @@ def _scatter_with_colorbar(
                         cmap=cmap, norm=norm_for_colorbar)
         return sc, norm_for_colorbar
 
-    # ---- 6) Your ThresholdNormalize cases (keep as-is, just moved here) ----
-    if colorbar_key == "sSFRRatioPericenter":
-        class ThresholdNormalize(mcolors.Normalize):
-            def __init__(self, vmin=None, vmax=None, threshold=1.0, **kwargs):
-                super().__init__(vmin, vmax, **kwargs)
-                self.threshold = threshold
 
-            def __call__(self, value, clip=None):
-                value = np.asarray(value)
-                out = super().__call__(value, clip)
-                out[value > self.threshold] = 1.0
-                return out
-
-        norm_for_colorbar = ThresholdNormalize(vmin=0, vmax=2, threshold=1)
-        color_values = color_values.astype(float)
-        
-
-        sc = ax.scatter(
-            x, y, c=color_values,
-            edgecolor=edgecolor, alpha=alpha_scatter,
-            lw=1.2 * linewidth,
-            marker=marker,
-            s=4 * size,
-            cmap=cmap, norm=norm_for_colorbar,
-        )
+    if colorbar_key == "MDM_Norm_Max_99":
+        norm_for_colorbar = mpl.colors.LogNorm(vmin=0.005, vmax=0.2)
+        sc = ax.scatter(x, y, c=color_values,  ls = lines(names_l), edgecolor=edgecolor,
+                        alpha=alpha_scatter, lw=1.2 * linewidth, marker=marker, s=size,
+                        cmap=cmap, norm=norm_for_colorbar)
         return sc, norm_for_colorbar
+    
 
-    if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"]:
-        class ThresholdNormalize(mcolors.Normalize):
-            def __init__(self, vmin=None, vmax=None, threshold=1.0, **kwargs):
-                super().__init__(vmin, vmax, **kwargs)
-                self.threshold = threshold
+    # ---- 6) Your ThresholdNormalize cases (keep as-is, just moved here) ----
+    
 
-            def __call__(self, value, clip=None):
-                value = np.asarray(value)
-                out = super().__call__(value, clip)
-                out[value > self.threshold] = 1.0
-                return out
+    if colorbar_key == "sSFRRatioPericenter":
+        # class ThresholdNormalize(mcolors.Normalize):
+        #     def __init__(self, vmin=None, vmax=None, threshold=1.0, **kwargs):
+        #         super().__init__(vmin, vmax, **kwargs)
+        #         self.threshold = threshold
 
-        if colorbar_key in ["logStarZ_99"]:
-            norm_for_colorbar = ThresholdNormalize(vmin=0, vmax=0.6, threshold=0.3)
-        else:
-            norm_for_colorbar = ThresholdNormalize(vmin=-0.75, vmax=0.6 - 0.75, threshold=0.3 - 0.75)
+        #     def __call__(self, value, clip=None):
+        #         value = np.asarray(value)
+        #         out = super().__call__(value, clip)
+        #         out[value > self.threshold] = 1.0
+        #         return out
 
+        # norm_for_colorbar = ThresholdNormalize(vmin=0, vmax=2, threshold=1)
+        # color_values = color_values.astype(float)
+        
+        # sc = ax.scatter(
+        #     x, y, c=color_values, ls = lines(names_l),
+        #     edgecolor=edgecolor, alpha=alpha_scatter,
+        #     lw=1.2 * linewidth,
+        #     marker=marker,
+        #     s=4 * size,
+        #     cmap=cmap, norm=norm_for_colorbar,
+        # )
+        # return sc, norm_for_colorbar
+        color_values = color_values.astype(float)
+
+        # limites dos bins
+        bounds = [0.0, 0.5, 1.0, 1.5, 2.0]
+    
+        # pega 4 cores discretas do cmap original
+        base_cmap = plt.get_cmap(cmap)
+        discrete_colors = base_cmap(np.linspace(0, 1, 4))
+        cmap_disc = mcolors.ListedColormap(discrete_colors)
+    
+        # normalização discreta
+        norm_for_colorbar = mcolors.BoundaryNorm(bounds, cmap_disc.N, clip=True)
+    
         sc = ax.scatter(
-            x, y, c=color_values,
+            x, y,
+            c=color_values,
+            ls = lines(names_l),
             edgecolor=edgecolor,
             alpha=alpha_scatter,
-            lw=1.1 * linewidth if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"] else 1.5 * linewidth,
+            lw=1.2 * linewidth,
             marker=marker,
-            s=5 * size if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"] else 7 * size,
-            cmap=cmap, norm=norm_for_colorbar,
+            s=size,
+            cmap=cmap_disc,
+            norm=norm_for_colorbar,
+        )
+    
+        return sc, norm_for_colorbar
+
+    # if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"]:
+    #     class ThresholdNormalize(mcolors.Normalize):
+    #         def __init__(self, vmin=None, vmax=None, threshold=1.0, **kwargs):
+    #             super().__init__(vmin, vmax, **kwargs)
+    #             self.threshold = threshold
+
+    #         def __call__(self, value, clip=None):
+    #             value = np.asarray(value)
+    #             out = super().__call__(value, clip)
+    #             out[value > self.threshold] = 1.0
+    #             return out
+
+    #     if colorbar_key in ["logStarZ_99"]:
+    #         norm_for_colorbar = ThresholdNormalize(vmin=0, vmax=0.6, threshold=0.3)
+    #     else:
+    #         norm_for_colorbar = ThresholdNormalize(vmin=-0.75, vmax=0.6 - 0.75, threshold=0.3 - 0.75)
+
+    #     sc = ax.scatter(
+    #         x, y, c=color_values,
+    #         edgecolor='k',
+    #         alpha=alpha_scatter,
+    #         lw=0.9,
+    #         marker=markers(names_l+'Colorbar'),
+    #         s= size,
+    #         cmap=cmap, norm=norm_for_colorbar,
+    #     )
+
+    #     if (colorbar_key == "logStarZ_99") and HIGHLIGHTPoints:
+    #         ax.scatter(8.994623, 0.088216, marker="*", color="blue", edgecolor="forestgreen", s=350)
+    #         ax.scatter(9.157864, 0.321646, marker="*", color="black", edgecolor="black", s=50)
+    #         ax.scatter(9.066031, 0.272490, marker="*", color="black", edgecolor="black", s=50)
+
+    #     return sc, norm_for_colorbar
+    
+    if colorbar_key in ["logStarZ_99_75dex"]:
+        
+        sc = ax.scatter(
+            x, y, c=color_values,
+            edgecolor='k',
+            alpha=alpha_scatter,
+            lw=0.9,
+            marker=markers(names_l+'Colorbar'),
+            s= size,
+            cmap=cmap, vmin=-0.75, vmax=0.6 - 0.75
         )
 
-        if (colorbar_key == "logStarZ_99") and HIGHLIGHTPoints:
-            ax.scatter(8.994623, 0.088216, marker="*", color="blue", edgecolor="forestgreen", s=350)
-            ax.scatter(9.157864, 0.321646, marker="*", color="black", edgecolor="black", s=50)
-            ax.scatter(9.066031, 0.272490, marker="*", color="black", edgecolor="black", s=50)
 
         return sc, norm_for_colorbar
+    
 
     # ---- 7) Fallback: your default branch (vmin=min, vmax=max) ----
     # NOTE: protect against all-NaN / empty arrays to avoid ValueError

@@ -165,6 +165,9 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
             elif 'Selected' in name:
                 lwe = 1.
                 
+            
+                
+                
             else:
                 lw = lwe = 0
                 
@@ -175,6 +178,9 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
             else:
                 if 'Normal' in name:
                     msizeMult = 1.8
+                    
+                    if 'Colorbar' in name:
+                        msizeMult = 0.8
                     
                 if 'SBC' in name or 'MBC' in name  or 'Diffuse' in name:
                     msizeMult = 0.8
@@ -191,6 +197,10 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
                         custom_lines.append(
                         Line2D([0], [0], color='white', lw=lw, marker=markers(name),  markeredgewidth = lwe,
                                markersize = msizeMult*msize(name), markeredgecolor = 'k'))
+                    if 'LoseTheirGas' in name:
+                        custom_lines.append(
+                        Line2D([0], [0], color='k', linestyle = lines(name), lw=1.1, marker=markers(name),  markeredgewidth = lwe,
+                               markersize = 0*msize(name), markeredgecolor = 'k', markerfacecolor='white'))
                     else:
                         custom_lines.append(
                         Line2D([0], [0], color=colors(name), lw=lw, marker=markers(name),  markeredgewidth = lwe,
@@ -236,9 +246,17 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
             label.append(titles(name))
         
         else:
+            if '_Norm_Max' in name:
+                mult = 0.7
+                
+            if 'CO' in name:
+                custom_lines.append(Line2D([0], [0], color='black', ls=lines(name), 
+                                           lw=mult * 0.5* linesthicker(name), dash_capstyle = capstyles(name)))
+                  
+            else:
             
-            custom_lines.append(Line2D([0], [0], color=colors(name), ls=lines(name), 
-                                       lw=mult * 0.5* linesthicker(name), dash_capstyle = capstyles(name)))
+                custom_lines.append(Line2D([0], [0], color=colors(name), ls=lines(name), 
+                                           lw=mult * 0.5* linesthicker(name), dash_capstyle = capstyles(name)))
             label.append(titles(name))
 
     if len(names) < 4:
@@ -641,7 +659,10 @@ def PlotMedianEvolution(
 
                         # Legacy: if phasing plot + “LoseTheir” gas case: cut after first NaN
                         if PhasingPlot and isinstance(row, str) and isinstance(column, str):
+                            print(row, column)
+
                             if ("GasMass" in row) and ("LoseTheir" in column):
+                                print('Passou!')
                                 arg_nan = np.argwhere(np.isnan(values)).T[0]
                                 if len(arg_nan) > 0:
                                     values[arg_nan[0]:] = np.nan
@@ -682,7 +703,7 @@ def PlotMedianEvolution(
                             xParam[m], values[m],
                             color=colors(names[l]),
                             ls=lines(names[l]),
-                            lw=1.5 * linesthicker(names[l]),
+                            lw=1.5 * linewidth,
                             dash_capstyle=capstyles(names[l]),
                         )
                         ax.fill_between(
@@ -696,22 +717,19 @@ def PlotMedianEvolution(
                         # entry markers
                         if EntryMedian:
                             dfPop = TNG.extractPopulation(names[l] + column, dfName=dfName)
-                            snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
-                            snap_final = int(np.nanmedian(dfPop.Snap_At_FinalEntry))
-                            if not np.isnan(snap_first) and not np.isnan(snap_final):
-                                ax.axvline(
-                                    dfTime.Age.loc[dfTime.Snap == snap_first].values[0],
-                                    ymax=0.15 - l * 0.015,
-                                    ls="solid", color=colors(names[l]),
-                                    lw=1.5 * linesthicker(names[l]),
-                                )
-                                ax.axvline(
-                                    dfTime.Age.loc[dfTime.Snap == snap_final].values[0],
-                                    ymax=0.15 - l * 0.015,
-                                    ls="--", color=colors(names[l]),
-                                    lw=1.5 * linesthicker(names[l]),
-                                )
-
+                            if not 'Central' in names[l] + column:
+                                snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
+                                if not np.isnan(snap_first):
+                                   x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
+                                   
+                                   ax.plot(
+                                        [x_entry, x_entry], [0.98, 1.03],
+                                        transform=ax.get_xaxis_transform(),
+                                        color=colors(names[l]),
+                                        lw=2.6,
+                                        alpha=1.,
+                                        clip_on=False
+                                    )
                         # pericenter marker
                         if Pericenter and len(argInfall1) > 0:
                             idx = argInfall1[-1]
@@ -751,7 +769,7 @@ def PlotMedianEvolution(
                             x[m], values[m],
                             color=colors(names[l]),
                             ls=lines(names[l]),
-                            lw=1.5 * linesthicker(names[l]),
+                            lw=1.5 * linewidth,
                             dash_capstyle=capstyles(names[l]),
                             zorder=1
                         )
@@ -857,6 +875,14 @@ def PlotMedianEvolution(
                                 values[values < -13.5] = np.nan
                             elif "SFR" in str(paramname):
                                 values[values < -4] = np.nan
+                                
+                            # Legacy: if phasing plot + “LoseTheir” gas case: cut after first NaN
+                            if PhasingPlot:
+                                if ("GasMass" in row[0] and "GasMass" in row[1]) and ("LoseTheir" in column):
+                                    arg_inf = np.argwhere(np.isinf(values)).T[0]
+                                    arg_inf = arg_inf[arg_inf > 5]
+                                    if len(arg_inf) > 0:
+                                        values[arg_inf[0]:] = np.nan
 
                             if CompareToNormal:
                                 err = np.sqrt((Yerr) ** 2.0 + (err) ** 2.0)
@@ -880,7 +906,7 @@ def PlotMedianEvolution(
                                 xParam[m], values[m],
                                 color=colors(names[l]),
                                 ls=lines(paramname),
-                                lw=1.7 * linesthicker(paramname),
+                                lw=1.5 * linewidth,
                                 dash_capstyle=capstyles(paramname),
                             )
                             ax.fill_between(
@@ -891,24 +917,20 @@ def PlotMedianEvolution(
                                 alpha=alphaShade,
                             )
 
-                            # EntryMedian block: keep, but remove dead self-comparison
+                            # entry markers
                             if EntryMedian:
                                 dfPop = TNG.extractPopulation(names[l] + column, dfName=dfName)
-                                snaps = np.asarray(dfPop.Snap_At_FirstEntry.values, dtype=float)
-                                snaps = snaps[~np.isnan(snaps)]
-                                if len(snaps) > 5:
-                                    snap_med = int(np.nanmedian(snaps))
-                                    ax.axvline(
-                                        dfTime.Age.loc[dfTime.Snap == snap_med].values[0],
-                                        ymax=0.15 - l * 0.015,
-                                        ls="solid", color=colors(names[l]),
-                                        lw=1.5 * linesthicker(names[l]),
-                                    )
-                                    ax.axvline(
-                                        dfTime.Age.loc[dfTime.Snap == snap_med].values[0],
-                                        ymax=0.15 - l * 0.015,
-                                        ls="--", color=colors(names[l]),
-                                        lw=1.5 * linesthicker(names[l]),
+                                snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
+                                if not np.isnan(snap_first):
+                                   x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
+                                   
+                                   ax.plot(
+                                        [x_entry, x_entry], [0.98, 1.03],
+                                        transform=ax.get_xaxis_transform(),
+                                        color=colors(names[l]),
+                                        lw=2.6,
+                                        alpha=1.,
+                                        clip_on=False
                                     )
 
                         else:
@@ -918,7 +940,7 @@ def PlotMedianEvolution(
                                 x[m], values[m],
                                 color=colors(names[l]),
                                 ls=lines(paramname),
-                                lw=1.7 * linesthicker(paramname),
+                                lw=0.9 * linesthicker(paramname),
                                 dash_capstyle=capstyles(paramname)
                             )
                             # Keep legacy snap markers but make safe for length
@@ -1301,6 +1323,27 @@ def PlotHist(
                     density=density, linewidth=linewidth)
             return
         
+        if param == 'deltaSize_at_Entry':
+            bins_edges = np.linspace(-1.5, 3.5, 10)
+            ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
+                    color=colors(name_key), ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            return
+        
+        if param == 'U-r':
+            bins_edges = np.linspace(-0.2, 2, 10)
+            ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
+                    color=colors(name_key), ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            return
+        
+        if param == 'sSFRinHalfRadAfterz5':
+            bins_edges = np.linspace(-11.8, -9.2, 10)
+            ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
+                    color=colors(name_key), ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            return
+        
         if 'logStarZ_99' in param or 'logZ' in param:
             bins_edges = np.linspace(-0.8, -0.45, 5)
             bins_edges = np.append(bins_edges, np.linspace(-0.45, 0.1, 8))
@@ -1329,9 +1372,9 @@ def PlotHist(
             return
         if which == 'mean':
             center = np.nanmean(v_raw)
-            ymax = 0.15
+            ymax = 0.5
             ax.axvline(center, ymax=ymax, color=colors(name_key),
-                       ls=lines(name_key), linewidth=2.3 * linewidth)
+                       ls=lines(name_key), linewidth=1.5 * linewidth) # ymax=ymax,
             if medianPlot:
                 # choose ONE: bootstrap or std. Keep std as fallback
                 try:
@@ -1345,9 +1388,9 @@ def PlotHist(
                            alpha=alphaShade)
         else:
             center = np.nanmedian(v_raw)
-            ymax = 0.15
+            ymax = 0.5
             ax.axvline(center, ymax=ymax, color=colors(name_key),
-                       ls=lines(name_key), linewidth=2.3 * linewidth, zorder = 5)
+                       ls=lines(name_key), linewidth=1.5 * linewidth, zorder = 5) 
             if medianPlot:
                 try:
                     xerr = MATH.boostrap_func(v_raw, num_boots=nboots)
@@ -1757,11 +1800,11 @@ def PlotScatter(
         if (ParamX == "MassIn_Infall_to_GasLost") and (ParamsY[0] == "MassAboveAfter_Infall_to_GasLost"):
             x = np.linspace(0, 1)
             y = -x
-            ax.plot(x, y, color="darkorange", linestyle="dashed", lw=2)
+            ax.plot(x, y, color="darkorange", linestyle="dashed", lw=linewidth)
 
 
-            ax.axvline(0,color = 'black',linestyle='dashed',lw=2)
-            ax.axhline(0,color = 'black',linestyle='dashed',lw=2)
+            ax.axvline(0,color = 'black',linestyle='dashed',lw=linewidth)
+            ax.axhline(0,color = 'black',linestyle='dashed',lw=linewidth)
             
             ax.fill_between([0, 500], -500, 0, alpha=0.2, color='tab:green')  # yellow
             ax.fill_between([-500, 0], -500, 0, alpha=0.2, color='tab:red')  # orange
@@ -1773,16 +1816,17 @@ def PlotScatter(
         elif (ParamX == 'Relative_logInnerZ_At_Entry' and  (ParamsY[0] == 'Relative_logZ_At_Entry')) :
             xfitline  = np.linspace(0 ,1, 100)
             axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth)
-            axs[i][j].plot( xfitline, np.zeros(100), ls='--', color='tab:red', linewidth=linewidth, zorder = 1)
+            axs[i][j].plot( xfitline, np.zeros(100), ls='--', color='k', linewidth=linewidth, zorder = 1)
 
         elif (ParamX == 'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry' and  (ParamsY[0] == 'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry')) :
 
             xfitline  = np.linspace(-6 ,2, 100)
-            axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth)
-            axs[i][j].fill_between(xfitline, -7, xfitline, alpha=0.2, color='tab:red')  # orange
-            axs[i][j].text(0.2, -1.25, "TS", fontsize = 0.99*fontlabel)
-            axs[i][j].fill_between(xfitline, xfitline, 1, alpha=0.2, color='tab:blue')  # orange
-            axs[i][j].text(-1.8,-1., "SF", fontsize = 0.99*fontlabel)
+            ax.axvline(0,color = 'black',linestyle='dashed',lw=linewidth, zorder = 1)
+            axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth, zorder = 1)
+            #axs[i][j].fill_between(xfitline, -7, xfitline, alpha=0.2, color='tab:red')  # orange
+            axs[i][j].text(-1.0, -1.4, "TS", fontsize = 0.99*fontlabel)
+            #axs[i][j].fill_between(xfitline, xfitline, 1, alpha=0.2, color='tab:blue')  # orange
+            axs[i][j].text(-1.4,-1., "iSP", fontsize = 0.99*fontlabel)
             
         elif (ParamX == 'sSFRTrueInner_BeforeEntry' and  (ParamsY[0] == 'sSFRTrueInner_Entry_to_Nogas')) :
 
@@ -1790,17 +1834,17 @@ def PlotScatter(
            axs[i][j].plot( x, x, ls='--', color='tab:blue', linewidth=linewidth)
         
            xfitline  = np.linspace(-13 ,-7, 100)
-           axs[i][j].fill_between(xfitline, -12, xfitline, alpha=0.2, color='tab:red')  # orange
+           #axs[i][j].fill_between(xfitline, -12, xfitline, alpha=0.2, color='tab:red')  # orange
            axs[i][j].text(-10,-10.55, "Inner $\overline{\mathrm{sSFR}}$ \n decrease", fontsize = 0.99*fontlabel)
-           axs[i][j].fill_between(xfitline, xfitline,-8, alpha=0.2, color='tab:blue')  # orange
+           #axs[i][j].fill_between(xfitline, xfitline,-8, alpha=0.2, color='tab:blue')  # orange
            axs[i][j].text(-10.9,-9.5, "Inner $\overline{\mathrm{sSFR}}$  \n increase", fontsize = 0.99*fontlabel)
 
      
 
         elif (ParamX == "Decrease_Entry_To_NoGas_Norm_Delta" and (firstY == "Decrease_NoGas_To_Final_Norm_Delta")):
             xfitline = np.linspace(-2, 0.4, 100)
-            ax.fill_between(xfitline, -1, xfitline, alpha=0.2, color="tab:red")
-            ax.fill_between(xfitline, xfitline, 0.25, alpha=0.2, color="tab:blue")
+            # ax.fill_between(xfitline, -1, xfitline, alpha=0.2, color="tab:red")
+            # ax.fill_between(xfitline, xfitline, 0.25, alpha=0.2, color="tab:blue")
             ax.text(-0.6, -0.8, "Faster compaction \n after gas loss", fontsize=0.99 * fontlabel)
             ax.text(-0.80, -0.25, "Faster compaction  \n with gas ", fontsize=0.99 * fontlabel)
             ax.axvline(0, color="black", linestyle="dashed", lw=linewidth)
@@ -1809,6 +1853,26 @@ def PlotScatter(
             ax.set_xticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
             ax.set_yticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
             ax.set_yticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
+            
+        elif (ParamX == "global_color_U_minus_r_1xRh" and (firstY == "ratio_color_U_minus_r_1xRh")):
+            xfitline = np.linspace(-0.75, 2.5, 100)
+            ax.fill_between(xfitline , -1.5, 0 , alpha=0.1, color="tab:blue")
+            # ax.fill_between(xfitline, xfitline, 0.25, alpha=0.2, color="tab:blue")
+            ax.axvline(0, color="black", linestyle="dashed", lw=linewidth)
+            ax.axhline(0, color="black", linestyle="dashed", lw=linewidth)
+           
+        elif (ParamX == "Decrease_Entry_To_NoGas" and (firstY == "Decrease_NoGas_To_Final")):
+            #xfitline = np.linspace(-2, 0.4, 100)
+            # ax.fill_between(xfitline, -1, xfitline, alpha=0.2, color="tab:red")
+            # ax.fill_between(xfitline, xfitline, 0.25, alpha=0.2, color="tab:blue")
+            ax.text(-0.55, -1.3, "Larger compaction \n after gas loss", fontsize=0.99 * fontlabel)
+            ax.text(-1.2, 0.2, "Larger compaction  \n with gas ", fontsize=0.99 * fontlabel)
+            ax.axvline(0, color="black", linestyle="dashed", lw=linewidth, zorder = 1)
+            ax.axhline(0, color="black", linestyle="dashed", lw=linewidth, zorder = 1)
+            # ax.set_xticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
+            # ax.set_xticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
+            # ax.set_yticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
+            # ax.set_yticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
 
         elif (ParamX == "Rhalf_MaxProfile_Minus_HalfRadstar_Entry" and (firstY == "Rhalf_MinProfile_Minus_HalfRadstar_Entry")):
             xfitline = np.linspace(-6, 2, 100)
@@ -1886,7 +1950,7 @@ def PlotScatter(
                    color=colors(name),
                    edgecolor=edcolor,
                    alpha=alphaScater,
-                   lw=0.6*linesthicker(name),
+                   lw=0.9,
                    marker=markers(name),
                    s=msizet * msize(name))
         return None, None
@@ -1942,17 +2006,22 @@ def PlotScatter(
         
         else:
             if COLORBAR[0] == 'sSFRRatioPericenter':
-                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.25, 0.5, 0.75, 1,  2], pad=0.02, aspect=(ratioColorbar or 50))
-                cb.ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1', '2'])
+                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0,  0.5,  1, 1.5,  2], pad=0.02, aspect=(ratioColorbar or 50))
+                cb.ax.set_yticklabels(['0',  '0.5', '1', '1.5', '2'])
             elif COLORBAR[0]  in ["logStarZ_99"]:
                 cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0, 0.1, 0.2, 0.3, 0.7], pad=0.02, aspect=(ratioColorbar or 50))
 
                 cb.ax.set_yticklabels(['0', '0.1', '0.2', '0.3', '0.7'])
                 
             elif COLORBAR[0]  in ["logStarZ_99_75dex"]:
-                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[-0.7, -0.6, -0.5, 0.], pad=0.02, aspect=(ratioColorbar or 50))
+                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[-0.7, -0.6, -0.5,  -0.4, -0.3, -0.2, -0.1, 0.], pad=0.02, aspect=(ratioColorbar or 50))
 
-                cb.ax.set_yticklabels(['-0.7', '-0.6', '-0.5', '0'])
+                cb.ax.set_yticklabels(['-0.7', '-0.6', '-0.5', '-0.4', '-0.3', '-0.2', '-0.1', '0'])
+                
+            elif COLORBAR[0]  in ["z_At_FirstEntry"]:
+                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0.4, 0.8], pad=0.02, aspect=(ratioColorbar or 50))
+
+                cb.ax.set_yticklabels(['0.4', '0.8'])
                 
             else:
                 cb = fig.colorbar(mappable, ax=axs.ravel().tolist(), pad=0.02, aspect=(ratioColorbar or 50))
@@ -2049,15 +2118,23 @@ def PlotScatter(
                         xmean, ymed,
                         yerr=(ymed - yq_lo, yq_hi - ymed),
                         ls="None", markeredgecolor="black", elinewidth=2, ms=10,
-                        fmt="s", c=colors[name],
+                        fmt="s", c=colors(name),
                     )
 
                 elif medianDot:
-                    ax.scatter(
-                        np.nanmedian(x_plot), np.nanmedian(y_plot),
-                        marker="*", edgecolor="black",
-                        c=colors(name), s=450, lw=1.5, zorder = 20
-                    )
+                    if COLORBAR is not None :
+                        
+                        ax.scatter(
+                            np.nanmedian(x_plot), np.nanmedian(y_plot),
+                            marker=markers(name+'Colorbar'), edgecolor='red', facecolor = 'none', # c =colors(name), 
+                            s=1.5*msizet * msize(name+'Colorbar'), lw=1.7, zorder = 20, alpha = 1.
+                        )
+                    else:
+                        ax.scatter(
+                            np.nanmedian(x_plot), np.nanmedian(y_plot),
+                            marker='*', edgecolor='red', c =colors(name), 
+                            s=55*msizet , lw=0.8, zorder = 20, alpha = 1.
+                        )
 
                 elif medianAll:
                     xmean, ymed, yq_hi, yq_lo = MATH.split_quantiles(
@@ -2131,6 +2208,7 @@ def PlotScatter(
                     
             # X label on last row
             if i == len(ParamsY) - 1:
+                
                 if len(ParamsX) > 1 and label_general:
                     ax.set_xlabel(labelsequal.get(ParamsX[j], ParamsX[j]), fontsize=1.2 * fontlabel)
                     if  ParamsX[j] == 'z_Birth':
@@ -2145,17 +2223,21 @@ def PlotScatter(
                 
                 
                 else:
+                   
+
                     ax.set_xlabel(labels.get(ParamsX[0], ParamsX[0]), fontsize=1.2 * fontlabel)
                     if xscale != None:
                         ax.set_xscale(xscale)
                     else:
                         ax.set_xscale(scales(ParamsX[0]))
+                        
+                   
                     if len(ParamsX) > 1 and ParamsX[j] == 'z_Birth':
                         ax.set_xscale('symlog',linthresh=0.02)
                         ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
                         ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
-                        
-                    if xscale == None and scales(ParamX[0]) in ("log", "symlog") and not ParamsX[j] == 'z_Birth':
+
+                    if xscale == None and "log" in scales(ParamsX[0]) and not ParamsX[j] == 'z_Birth':
                         ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
                         
                 ax.tick_params(axis="x", labelsize=0.99 * fontlabel)
@@ -4717,9 +4799,77 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
 
     return
 
+# def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample,
+#                      PartType='PartType4', velPlot=False, gasSF=False):
+
+#     yIDs = []
+#     massIDs = []
+#     xIDs = []
+#     notIndex = []
+
+#     for l, ID in enumerate(IDs):
+#         if ID in [603556, 602133]:
+#             continue
+
+#         snap = Snaps[l]
+#         if np.isnan(snap):
+#             continue
+#         snap = int(snap)
+
+#         yrad, rad, mass = TNG.MakeDensityProfileMean(
+#             snap, ID, rmin, rmax, nbins,
+#             PartType=PartType,
+#             velPlot=velPlot,
+#             gasSF=gasSF
+#         )
+
+#         # proteção contra retornos inválidos
+#         if len(yrad) == 1 or (ID == 603556 or ID == 602133):
+#             notIndex = np.append(notIndex, l)
+#             continue
+        
+#         if (
+#             yrad is None or rad is None or mass is None
+#             or len(yrad) == 0
+#             or len(rad) == 0
+#             or len(mass) == 0
+#             or len(yrad) != nbins
+#             or len(rad) != nbins
+#             or len(mass) != nbins
+#         ):
+#             notIndex.append(l)
+#             continue
+
+#         yIDs.append(yrad)
+#         xIDs.append(rad)
+#         massIDs.append(mass)
+
+#     if len(yIDs) == 0:
+#         return np.nan, np.nan, np.nan, np.nan, np.array([]), np.array([]), np.array([]), np.array(notIndex)
+
+#     yIDs = np.array(yIDs)
+#     xIDs = np.array(xIDs)
+#     massIDs = np.array(massIDs)
+
+#     Rvalues = xIDs.T
+#     Values = yIDs.T
+#     Masses = massIDs.T
+
+#     x = np.array([])
+#     y = np.array([])
+#     yerr = np.array([])
+#     mass = np.array([])
+
+#     for k, value in enumerate(Values):
+#         x = np.append(x, np.nanmedian(Rvalues[k]))
+#         y = np.append(y, np.nanmedian(value))
+#         yerr = np.append(yerr, MATH.boostrap_func(value, func=np.nanmedian, num_boots=1000))
+#         mass = np.append(mass, np.nanmedian(Masses[k]))
+
+#     return x, y, yerr, mass, xIDs, yIDs, massIDs, np.array(notIndex)
 
 
-def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample, PartType = 'PartType4', velPlot= False):
+def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample, PartType = 'PartType4', Cond = 'None', velPlot= False, gasSF = False):
     yIDs  = np.array([])
     massIDs = np.array([])
     xIDs = np.array([])
@@ -4733,7 +4883,7 @@ def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample, PartType = 'PartTy
             continue
         snap = int(snap)
         #print('snap: ', snap)
-        yrad, rad, mass = TNG.MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = PartType, velPlot= velPlot)
+        yrad, rad, mass = TNG.MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = PartType, velPlot= velPlot, Cond = Cond, gasSF = True)
         
         if len(yrad) == 1 or (ID == 603556 or ID == 602133):
             notIndex = np.append(notIndex, l)
@@ -4742,8 +4892,14 @@ def MakeMedianAndIDs(Snaps, IDs, rmin, rmax, nbins, dfSample, PartType = 'PartTy
             yIDs  = np.append(yIDs , yrad)
             xIDs = np.append(xIDs, rad)
             massIDs = np.append(massIDs, mass)
+            lenPrevious = len(yrad)
     
         else:
+            if len(yrad) == 0:
+                yrad = np.zeros(lenPrevious)*np.nan
+                mass = np.zeros(lenPrevious)*np.nan
+                rad = np.zeros(lenPrevious)*np.nan
+
             yIDs  = np.vstack((yIDs , yrad))
             massIDs = np.vstack((massIDs, mass))
             xIDs = np.vstack((xIDs, rad))
@@ -4811,4 +4967,3 @@ def MakeLines(j, ax,  yIDs, xIDs, IDs, notIndex, colors):
     #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)], y_p2[~np.isnan(y_p2)], y_p97[~np.isnan(y_p97)], color=ColorFill, alpha=0.2)  # 2σ equivalent
     #else:
     #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)] , y_p2[~np.isnan(y_p2)]  * xvalues[~np.isnan(y_p2)]**2., y_p97[~np.isnan(y_p97)]  * xvalues[~np.isnan(y_p97)]**2., color=ColorFill, alpha=0.2)  # 2σ equivalent
-

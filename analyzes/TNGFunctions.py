@@ -2249,6 +2249,7 @@ def makedataevolution(names, columns, row, PhasingPlot = False,
                 if PhasingPlot:
                     yphase, y, yerr = makeMedianPhases(population, param, dfName = dfName,  Name = Name)
                     Timephase, TimeParam, Timeerr = makeMedianPhases(population, 'TimeID', dfName = dfName,  Name = Name)
+                    
                     dataNameTime.append(TimeParam)
                     dataNamePhaseTime.append(Timephase)
                     dataNamePhase.append(yphase)
@@ -2712,10 +2713,26 @@ def extractPopulation(sample, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHisto
 
                 df = df.loc[df.FasterCompaction == name]
         for name in ['DMrich', 'DMpoor']:
-            if name in sample:
+            if name in sample and not 'Referee' in sample and not ('Diffuse' in sample or 'NormalDif' in sample):
                 #print('DMFracStatus', name)
 
                 df = df.loc[df.DMFracStatus == name]
+            if 'Diffuse' in sample or 'NormalDif' in sample:
+                if name == 'DMrich' and name in sample:
+                    name = 'NotInteract'
+                    df = df.loc[df.SatelliteEnvironment == name]
+                elif name == 'DMpoor' and name in sample:
+                     name = 'Interact'
+                     df = df.loc[df.SatelliteEnvironment == name]
+
+            
+        for name in ['DMpoor_05_Referee', 'DMrich_05_Referee']:
+            if name in sample:
+                df = df.loc[df.DMFracStatus_Referee_05 == name]
+                
+        for name in ['DMpoor_08_Referee', 'DMrich_08_Referee']:
+            if name in sample:
+                df = df.loc[df.DMFracStatus_Referee_08 == name]     
                 
         for name in ['NoneMajorMerger', 'MoreOneMajorMerger']:
             if name in sample:
@@ -4939,7 +4956,7 @@ def compare_Sample_key(key, populations, dfName = 'Sample', Name = 'Name', RankS
         print(population[0], ' and ',population[1])
         Sample1 = extractPopulation(population[0], dfName = dfName, Name = Name)
         Sample2 = extractPopulation(population[1], dfName = dfName, Name = Name)
-
+   
         try:
 
             if key == 'z_At_FinalEntry':
@@ -4979,8 +4996,228 @@ def Ratio_Sample_key(key, populations, log10 = True, Name = 'Name'):
         else:
             print('Ratio: ', round(np.nanmedian(Sample1[key].values) / np.nanmedian(Sample2[key].values), 4))
 
+# def MakeDensityProfileMean(
+#     snap, ID, rmin, rmax, nbins,
+#     PartType='PartType4',
+#     velPlot=False,
+#     MomAng=False,
+#     Cond='None',
+#     gasSF=False
+# ):
 
-def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', velPlot = False, MomAng = False, Cond = 'None'):
+#     factor = 1. / h / (1 + dfTime.z[int(99 - snap)])
+#     scalefactorsqrt = np.sqrt(1. / (1 + dfTime.z[int(99 - snap)]))
+
+#     dFHalfStar = extractDF('SubhaloHalfmassRadType4')
+#     dFHalfGasRad = extractDF('SubhaloHalfmassRadType0')
+
+#     HalfRad = dFHalfStar[str(ID)].loc[dFHalfStar.Snap == snap].values[0]
+#     HalfGasRad = dFHalfGasRad[str(ID)].loc[dFHalfGasRad.Snap == snap].values[0]
+
+#     if ID == 319738 and snap != 99:
+#         file = h5py.File('/home/abhner/Downloads/cutout_212960.hdf5', 'r')
+#     else:
+#         try:
+#             file = extractParticles(ID, snaps=[snap])[0]
+#         except Exception:
+#             return [0], [np.nan], [np.nan]
+
+#     try:
+#         pos = posStar = file['PartType4']['Coordinates'][:] * factor
+#         mass = massStar = file['PartType4']['Masses'][:] * 1e10 / h
+#         vel = velStar = file['PartType4']['Velocities'][:] * scalefactorsqrt
+
+#         JStar = massStar[:, np.newaxis] * (np.cross(posStar, velStar))
+
+#         Cen = np.array([
+#             MATH.weighted_median(posStar[:, 0], massStar),
+#             MATH.weighted_median(posStar[:, 1], massStar),
+#             MATH.weighted_median(posStar[:, 2], massStar)
+#         ])
+#         Vmean = np.array([
+#             MATH.weighted_median(velStar[:, 0], massStar),
+#             MATH.weighted_median(velStar[:, 1], massStar),
+#             MATH.weighted_median(velStar[:, 2], massStar)
+#         ])
+#         CenFind = True
+
+#     except Exception:
+#         posStar = velStar = np.array([0, 0, 0])
+#         massStar = np.array([0])
+#         JStar = massStar[:, np.newaxis] * (np.cross(posStar, velStar))
+#         CenFind = False
+
+#     try:
+#         posGas = file['PartType0']['Coordinates'][:] * factor
+#         massGas = file['PartType0']['Masses'][:] * 1e10 / h
+#         velGas = file['PartType0']['Velocities'][:] * scalefactorsqrt
+
+#         JGas = massGas[:, np.newaxis] * (np.cross(posGas, velGas))
+
+#         if not CenFind:
+#             pos = posGas
+#             mass = massGas
+#             vel = velGas
+#             Cen = np.array([
+#                 MATH.weighted_median(posGas[:, 0], massGas),
+#                 MATH.weighted_median(posGas[:, 1], massGas),
+#                 MATH.weighted_median(posGas[:, 2], massGas)
+#             ])
+#             Vmean = np.array([
+#                 MATH.weighted_median(velGas[:, 0], massGas),
+#                 MATH.weighted_median(velGas[:, 1], massGas),
+#                 MATH.weighted_median(velGas[:, 2], massGas)
+#             ])
+#             CenFind = True
+
+#     except Exception:
+#         posGas = velGas = np.array([0, 0, 0])
+#         massGas = np.array([0])
+#         JGas = massGas[:, np.newaxis] * (np.cross(posGas, velGas))
+
+#     try:
+#         posDM = file['PartType1']['Coordinates'][:] * factor
+#         massDM = file['Header'].attrs['MassTable'][1] * np.ones(len(file['PartType1']['Coordinates'])) * 1e10 / h
+#         velDM = file['PartType1']['Velocities'][:] * scalefactorsqrt
+
+#         JDM = massDM[:, np.newaxis] * (np.cross(posDM, velDM))
+
+#         if not CenFind:
+#             pos = posDM
+#             mass = massDM
+#             vel = velDM
+#             Cen = np.array([
+#                 MATH.weighted_median(posDM[:, 0], massDM),
+#                 MATH.weighted_median(posDM[:, 1], massDM),
+#                 MATH.weighted_median(posDM[:, 2], massDM)
+#             ])
+#             Vmean = np.array([
+#                 MATH.weighted_median(velDM[:, 0], massDM),
+#                 MATH.weighted_median(velDM[:, 1], massDM),
+#                 MATH.weighted_median(velDM[:, 2], massDM)
+#             ])
+#             CenFind = True
+
+#     except Exception:
+#         posDM = velDM = np.array([0, 0, 0])
+#         massDM = np.array([0])
+#         JDM = massDM[:, np.newaxis] * (np.cross(posDM, velDM))
+
+#     if PartType not in file.keys():
+#         print(f"Doesn't have {PartType} at snap: {snap}")
+#         return [0], [np.nan], [np.nan]
+
+#     pos = file[PartType]['Coordinates'][:] / (1 + dfTime.z.values[dfTime.Snap == snap]) / h
+#     vel = file[PartType]['Velocities'][:] * scalefactorsqrt
+
+#     if PartType == 'PartType1':
+#         mass = file['Header'].attrs['MassTable'][1] * np.ones(len(file[PartType]['Coordinates'])) * 1e10 / h
+#     else:
+#         mass = file[PartType]['Masses'][:] * 1e10 / h
+
+#     # -------------------------
+#     # filtro para star-forming gas
+#     # -------------------------
+#     if gasSF:
+#         if PartType != 'PartType0':
+#             raise ValueError("gasSF=True só pode ser usado com PartType='PartType0'")
+
+#         if 'StarFormationRate' not in file['PartType0'].keys():
+#             raise KeyError("O cutout não contém 'StarFormationRate' em PartType0")
+
+#         sfr = file['PartType0']['StarFormationRate'][:]
+#         mask_sf = sfr > 0.0
+
+#         pos = pos[mask_sf]
+#         vel = vel[mask_sf]
+#         mass = mass[mask_sf]
+
+#     pos = pos - Cen
+#     vel = vel - Vmean
+
+#     r = np.linalg.norm(pos, axis=1)
+#     velrad = np.sum(pos * vel, axis=1) / r
+#     jang = np.sqrt(np.sum(np.cross(pos, vel) * np.cross(pos, vel), axis=1))
+
+#     y = mass.copy()
+
+#     if Cond == 'AngMom':
+#         JMean = (
+#             np.nansum(JDM, axis=0) +
+#             np.nansum(JStar, axis=0) +
+#             np.nansum(JGas, axis=0)
+#         ) / (
+#             np.nansum(massGas) +
+#             np.nansum(massStar) +
+#             np.nansum(massDM)
+#         )
+
+#         j = np.cross(pos, vel)
+#         angelsTheta = np.array([])
+#         for jIndex in range(len(j)):
+#             param = np.dot(
+#                 JMean / abs(np.linalg.norm(JMean)),
+#                 j[jIndex] / abs(np.linalg.norm(j[jIndex]))
+#             )
+#             angelsTheta = np.append(angelsTheta, np.degrees(np.arccos(param)))
+
+#         Cond = (angelsTheta < 45)
+
+#         pos = pos[Cond]
+#         vel = vel[Cond]
+#         mass = mass[Cond]
+#         r = r[Cond]
+#         velrad = velrad[Cond]
+#         jang = jang[Cond]
+#         y = y[Cond]
+
+#     if len(r) == 0:
+#         return y, r, mass
+
+#     minvalue = rmin if np.min(r) <= rmin else np.min(r)
+#     maxvalue = rmax if np.max(r) >= rmax else np.max(r)
+
+#     if minvalue == 0:
+#         minvalue = rmin
+#     if maxvalue == 0:
+#         maxvalue = rmax
+
+#     bin_edges = np.geomspace(minvalue, maxvalue, nbins + 1)
+
+#     rad = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+#     yrad = np.zeros(nbins)
+#     massrad = np.zeros(nbins)
+
+#     for i in range(nbins):
+#         in_bin = (r >= bin_edges[i]) & (r < bin_edges[i + 1])
+
+#         y_in_bin = y[in_bin]
+#         velrad_in_bin = velrad[in_bin]
+#         jang_in_bin = jang[in_bin]
+
+#         volume = 4.0 / 3.0 * np.pi * (bin_edges[i + 1]**3 - bin_edges[i]**3)
+
+#         if np.sum(in_bin) < 50:
+#             yrad[i] = np.nan
+#             massrad[i] = np.nan
+#         else:
+#             if velPlot:
+#                 yrad[i] = np.nansum(y_in_bin * velrad_in_bin) / np.nansum(y_in_bin)
+#             elif MomAng:
+#                 yrad[i] = np.nansum(y_in_bin * jang_in_bin) / np.nansum(y_in_bin)
+#             else:
+#                 yrad[i] = np.nansum(y_in_bin) / volume
+#                 massrad[i] = np.nansum(y_in_bin)
+
+#     y = yrad
+#     r = rad
+#     mass = massrad
+
+#     return y, r, mass
+
+
+
+def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', velPlot = False, MomAng = False, Cond = 'None', gasSF = False):
 
     
     factor =  1. / h / (1+dfTime.z[int(99-snap)])
@@ -5088,6 +5325,28 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
         y =  file[PartType]['Masses'][:] * 1e10 / h
     
         
+    # filtro para star-forming gas
+    # -------------------------
+    
+    if PartType == 'PartType4':
+        gasSF = False
+        
+    if gasSF and Cond == 'SFgas':
+        if 'StarFormationRate' not in file['PartType0'].keys():
+            raise KeyError("O cutout não contém 'StarFormationRate' em PartType0")
+
+        sfr = file['PartType0']['StarFormationRate'][:]
+        mask_sf = sfr > 0.0
+
+        pos = pos[mask_sf]
+        vel = vel[mask_sf]
+        mass = mass[mask_sf]
+        r = r[mask_sf]
+        velrad = velrad[mask_sf]
+        jang = jang[mask_sf]
+        y = y[mask_sf]
+
+
     if Cond == 'AngMom':
                 
         JMean = (np.nansum(JDM, axis = 0) + np.nansum(JStar, axis = 0) + np.nansum(JGas, axis = 0)) / (np.nansum(massGas) + np.nansum(massStar) + np.nansum(massDM))
@@ -5116,10 +5375,8 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
         minvalue = rmin
     else:
         minvalue = np.min(r)
-    if np.max(r) >= rmax:
-        maxvalue = rmax
-    else:
-        maxvalue = np.max(r)
+    
+    maxvalue = np.max(r)
     
     if minvalue == 0:
         minvalue = rmin
@@ -5289,10 +5546,11 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
     
     dfParam = extractDF(param)
     dfStudy = extractPopulation(Study, dfName = dfName, Name = Name)
+    
     #try:
-    X_ = np.arange(-1, 9)
+    X_ = np.arange(-1, 5)
     X_ = np.append(X_, X_+0.5)
-    X_ = np.append(X_, np.linspace(-1, 9, N))
+    X_ = np.append(X_, np.linspace(-1, 5, N))
     X_ = np.unique(X_)
     N = len(X_)
     for i, ID in enumerate(dfStudy['SubfindID_99'].values):
@@ -6962,3 +7220,1866 @@ def Evolution200(
         'V200': df_V200.sort_index(),
         'J200': df_J200.sort_index()
     }
+
+
+#####################################################################################
+
+import json
+
+
+def EvolutionParticle_sSFR(
+    IDs,
+    dfSample,
+    Snaps=(11, 17, 25, 33, 40, 44, 50, 59, 67, 78, 81, 84, 88, 91, 95, 99),
+    aperture_mode="fixed_pkpc",
+    apertures=(1.0,),
+    reference_rh="final",
+    zmax_reference=5.0,
+    reference_stat="mean",   # "mean" or "median" for mean_z_lt
+    radius_floor_pkpc=None,
+    Update=False,
+    NearBirth=False,
+    NearEntryToGasLoss=False,
+    EntrySnap=False,
+    min_ngas=10,
+    min_nstar=10,
+    floor_log10_ssfr=-14.0,
+    PATH=os.getenv("HOME") + "/TNG_Analyzes/SubhaloHistory",
+    SAVEFILE="DFs",
+    SIM="TNG50",
+    NSim="-1",
+    save_particle_cache=True,
+    use_particle_cache=True,
+    save_long_table=True,
+    save_wide_tables=True,
+    verbose=False,
+):
+    """
+    Dedicated routine to compute sSFR evolution only.
+
+    aperture_mode:
+        - "fixed_pkpc"            : apertures are physical radii in pkpc
+        - "fraction_reference_rh" : apertures are fractions of a reference Rh
+        - "current_rh"            : apertures are multipliers of instantaneous Rh(t)
+
+    reference_rh:
+        - "final"      : uses z=0 stellar half-mass radius
+        - "mean_z_lt"  : uses average Rh over snapshots with z < zmax_reference
+
+    Saved particle cache per ID/snapshot contains only what is needed for sSFR:
+        gas_ids, r_gas_pkpc, mass_gas_msun, sfr_gas_msun_per_yr
+        star_ids, r_star_pkpc, mass_star_msun
+        center_pkpc, velbulk_kms, z, snap
+    """
+
+    # ---------- helpers ----------
+    def _fmt(x):
+        s = f"{float(x):.3f}".rstrip("0").rstrip(".")
+        return s.replace(".", "p").replace("-", "m")
+
+    def _mk_outdirs():
+        base = os.path.join(PATH, SIM, SAVEFILE, "sSFR")
+        cache = os.path.join(base, "particle_cache")
+        os.makedirs(base, exist_ok=True)
+        os.makedirs(cache, exist_ok=True)
+        return base, cache
+
+    def _new_wide_df(ids):
+        snaps = np.arange(100)
+        df = pd.DataFrame(data=np.nan, index=np.arange(100), columns=np.append(["Snap"], ids))
+        df["Snap"] = np.flip(snaps)
+        return df
+
+    def _load_wide_df(path, ids):
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            # ensure all IDs present
+            for _id in ids:
+                if str(_id) not in df.columns:
+                    df[str(_id)] = np.nan
+            return df
+        return _new_wide_df(ids)
+
+    def _save_wide_df(df, path):
+        df.to_csv(path, index=False)
+
+    def _subhalo_cache_file(cache_dir, ID, snap):
+        subdir = os.path.join(cache_dir, f"subhalo_{int(ID)}")
+        os.makedirs(subdir, exist_ok=True)
+        return os.path.join(subdir, f"snap_{int(snap):03d}_ssfr_particles.npz")
+
+    def _get_snap_z(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "z"].values[0])
+
+    def _get_snap_age(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "Age"].values[0])
+
+    def _get_snaps_for_id(ID, snaps_original):
+        snaps_id = np.array(snaps_original, dtype=int)
+
+        if NearBirth:
+            SubfindID = extractDF("SubfindID")
+            IDsSnaps = np.array([subID for subID in SubfindID[str(ID)]])
+            valid = np.argwhere(~np.isnan(IDsSnaps)).T[0]
+            if len(valid) > 0:
+                argBirth = valid[-1]
+                snap_birth = int(99 - argBirth)
+                age_birth = _get_snap_age(snap_birth)
+
+                snaps_at_0 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 0.15) &
+                    (dfTime.Age - age_birth > 0.0) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_at_1 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 1.1) &
+                    (dfTime.Age - age_birth > 0.9) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_id = np.unique(np.concatenate([[snap_birth], snaps_at_0, snaps_at_1])).astype(int)
+
+        if NearEntryToGasLoss:
+            col_entry = "SnapAtEntry_First" if "SnapAtEntry_First" in dfSample.columns else "Snap_At_FirstEntry"
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, col_entry].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 90
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 5, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            if snap_no_gas > snap_before + 10:
+                add_snaps = np.linspace(snap_before, snap_no_gas, 10).astype(int)
+            else:
+                add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+
+            dt = abs(_get_snap_age(snap_no_gas) - _get_snap_age(snap_entry))
+            snap_delta_before = dfTime.Snap.loc[
+                abs(dfTime.Age - _get_snap_age(snap_entry)) < dt
+            ].values
+            snap_delta_before = snap_delta_before[snap_delta_before < snap_entry]
+
+            snaps_id = np.unique(np.concatenate([add_snaps, [snap_before, snap_entry, snap_no_gas], snap_delta_before]))
+            snaps_id = snaps_id[(snaps_id > 0) & (snaps_id < 100)].astype(int)
+
+        if EntrySnap:
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, "Snap_At_FirstEntry"].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 99
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 3, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+            snaps_id = np.unique(np.concatenate([snaps_id, add_snaps])).astype(int)
+
+        return np.unique(snaps_id)
+
+    def _get_final_rh_pkpc(ID):
+        return float(10 ** dfSample.loc[dfSample.SubfindID_99 == ID, "logHalfRadstar_99"].values[0])
+
+    def _get_mean_rh_pkpc_zlt(ID, zmax=5.0, stat="mean"):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        arr_lin = 10 ** arr_log
+        z_arr = np.array(dfTime.z.values, dtype=float)
+
+        m = np.isfinite(arr_lin) & np.isfinite(z_arr) & (z_arr < zmax) & (arr_lin > 0)
+        if np.sum(m) == 0:
+            return np.nan
+
+        if stat == "median":
+            return float(np.nanmedian(arr_lin[m]))
+        return float(np.nanmean(arr_lin[m]))
+
+    def _get_current_rh_pkpc(ID, snap):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        return float(10 ** arr_log[99 - int(snap)])
+
+    def _reference_rh_pkpc(ID):
+        if reference_rh == "final":
+            return _get_final_rh_pkpc(ID)
+        elif reference_rh == "mean_z_lt":
+            return _get_mean_rh_pkpc_zlt(ID, zmax=zmax_reference, stat=reference_stat)
+        else:
+            raise ValueError("reference_rh must be 'final' or 'mean_z_lt'.")
+
+    def _build_apertures_for_snap(ID, snap):
+        if aperture_mode == "fixed_pkpc":
+            aps = []
+            for ap in apertures:
+                aps.append({
+                    "label": f"fixed_{_fmt(ap)}pkpc",
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": np.nan,
+                    "reference_rh_mode": "none",
+                    "aperture_input": float(ap),
+                })
+            return aps
+
+        elif aperture_mode == "fraction_reference_rh":
+            ref = _reference_rh_pkpc(ID)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * ref
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_{reference_rh}"
+                if reference_rh == "mean_z_lt":
+                    lbl += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": float(ref),
+                    "reference_rh_mode": reference_rh,
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        elif aperture_mode == "current_rh":
+            rh_now = _get_current_rh_pkpc(ID, snap)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * rh_now
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_current"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": float(rh_now),
+                    "reference_rh_mode": "current",
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        else:
+            raise ValueError("aperture_mode must be 'fixed_pkpc', 'fraction_reference_rh', or 'current_rh'.")
+
+    def _extract_or_load_particle_cache(ID, snap, cache_dir):
+        """
+        Returns a dict with only the quantities needed for sSFR.
+        """
+        cache_file = _subhalo_cache_file(cache_dir, ID, snap)
+
+        if use_particle_cache and os.path.exists(cache_file) and not Update:
+            data = np.load(cache_file, allow_pickle=True)
+            return {
+                "snap": int(data["snap"]),
+                "z": float(data["z"]),
+                "center_pkpc": data["center_pkpc"],
+                "velbulk_kms": data["velbulk_kms"],
+                "gas_ids": data["gas_ids"],
+                "r_gas_pkpc": data["r_gas_pkpc"],
+                "mass_gas_msun": data["mass_gas_msun"],
+                "sfr_gas_msun_per_yr": data["sfr_gas_msun_per_yr"],
+                "star_ids": data["star_ids"],
+                "r_star_pkpc": data["r_star_pkpc"],
+                "mass_star_msun": data["mass_star_msun"],
+            }
+
+        try:
+            f = extractParticles(ID, snaps=[int(snap)])[0]
+        except Exception:
+            return None
+
+        zsnap = _get_snap_z(snap)
+        a_sqrt = np.sqrt(1.0 / (1.0 + zsnap))
+
+        # Gas
+        try:
+            gas_ids = f["PartType0"]["ParticleIDs"][:]
+            posGas = f["PartType0"]["Coordinates"][:] / (1.0 + zsnap) / h
+            velGas = f["PartType0"]["Velocities"][:] * a_sqrt
+            massGas = f["PartType0"]["Masses"][:] * 1e10 / h
+            sfrGas = f["PartType0"]["StarFormationRate"][:]
+        except Exception:
+            gas_ids = np.array([], dtype=np.int64)
+            posGas = np.empty((0, 3), dtype=float)
+            velGas = np.empty((0, 3), dtype=float)
+            massGas = np.array([], dtype=float)
+            sfrGas = np.array([], dtype=float)
+
+        # Stars
+        try:
+            star_ids = f["PartType4"]["ParticleIDs"][:]
+            posStar = f["PartType4"]["Coordinates"][:] / (1.0 + zsnap) / h
+            velStar = f["PartType4"]["Velocities"][:] * a_sqrt
+            massStar = f["PartType4"]["Masses"][:] * 1e10 / h
+        except Exception:
+            star_ids = np.array([], dtype=np.int64)
+            posStar = np.empty((0, 3), dtype=float)
+            velStar = np.empty((0, 3), dtype=float)
+            massStar = np.array([], dtype=float)
+
+        # Center on stars first, then gas. If neither exists, skip.
+        if len(massStar) > 0:
+            Cen = np.array([
+                MATH.weighted_median(posStar[:, 0], massStar),
+                MATH.weighted_median(posStar[:, 1], massStar),
+                MATH.weighted_median(posStar[:, 2], massStar),
+            ])
+            VelBulk = np.array([
+                MATH.weighted_median(velStar[:, 0], massStar),
+                MATH.weighted_median(velStar[:, 1], massStar),
+                MATH.weighted_median(velStar[:, 2], massStar),
+            ])
+        elif len(massGas) > 0:
+            Cen = np.array([
+                MATH.weighted_median(posGas[:, 0], massGas),
+                MATH.weighted_median(posGas[:, 1], massGas),
+                MATH.weighted_median(posGas[:, 2], massGas),
+            ])
+            VelBulk = np.array([
+                MATH.weighted_median(velGas[:, 0], massGas),
+                MATH.weighted_median(velGas[:, 1], massGas),
+                MATH.weighted_median(velGas[:, 2], massGas),
+            ])
+        else:
+            return None
+
+        if len(posGas) > 0:
+            posGas = ETNG.FixPeriodic(posGas - Cen, sim=SIM + NSim)
+            velGas = velGas - VelBulk
+            rGas = np.linalg.norm(posGas, axis=1)
+        else:
+            rGas = np.array([], dtype=float)
+
+        if len(posStar) > 0:
+            posStar = ETNG.FixPeriodic(posStar - Cen, sim=SIM + NSim)
+            velStar = velStar - VelBulk
+            rStar = np.linalg.norm(posStar, axis=1)
+        else:
+            rStar = np.array([], dtype=float)
+
+        out = {
+            "snap": int(snap),
+            "z": float(zsnap),
+            "center_pkpc": Cen.astype(float),
+            "velbulk_kms": VelBulk.astype(float),
+            "gas_ids": gas_ids,
+            "r_gas_pkpc": rGas.astype(float),
+            "mass_gas_msun": massGas.astype(float),
+            "sfr_gas_msun_per_yr": sfrGas.astype(float),
+            "star_ids": star_ids,
+            "r_star_pkpc": rStar.astype(float),
+            "mass_star_msun": massStar.astype(float),
+        }
+
+        if save_particle_cache:
+            np.savez_compressed(
+                cache_file,
+                snap=out["snap"],
+                z=out["z"],
+                center_pkpc=out["center_pkpc"],
+                velbulk_kms=out["velbulk_kms"],
+                gas_ids=out["gas_ids"],
+                r_gas_pkpc=out["r_gas_pkpc"],
+                mass_gas_msun=out["mass_gas_msun"],
+                sfr_gas_msun_per_yr=out["sfr_gas_msun_per_yr"],
+                star_ids=out["star_ids"],
+                r_star_pkpc=out["r_star_pkpc"],
+                mass_star_msun=out["mass_star_msun"],
+            )
+
+        return out
+
+    # ---------- output prep ----------
+    dfTime.a = 1.0 / (1.0 + dfTime.z)
+    base_dir, cache_dir = _mk_outdirs()
+
+    # Preview labels
+    preview_labels = set()
+    if len(IDs) > 0:
+        _id0 = int(IDs[0])
+        for _snap0 in [99]:
+            for d in _build_apertures_for_snap(_id0, _snap0):
+                preview_labels.add(d["label"])
+
+    wide_ssfr = {}
+    wide_sfr = {}
+    wide_mstar = {}
+    wide_ap = {}
+
+    if save_wide_tables:
+        for label in sorted(preview_labels):
+            wide_ssfr[label] = _load_wide_df(os.path.join(base_dir, f"log_sSFR__{label}.csv"), IDs)
+            wide_sfr[label] = _load_wide_df(os.path.join(base_dir, f"log_SFR__{label}.csv"), IDs)
+            wide_mstar[label] = _load_wide_df(os.path.join(base_dir, f"log_Mstar__{label}.csv"), IDs)
+            wide_ap[label] = _load_wide_df(os.path.join(base_dir, f"R_ap_pkpc__{label}.csv"), IDs)
+
+    rows = []
+
+    # ---------- main loop ----------
+    for ID in IDs:
+        ID = int(ID)
+        snaps_id = _get_snaps_for_id(ID, Snaps)
+
+        if verbose:
+            print(f"ID = {ID} | snaps = {snaps_id}")
+
+        for snap in snaps_id:
+            snap = int(snap)
+            pdata = _extract_or_load_particle_cache(ID, snap, cache_dir)
+            if pdata is None:
+                continue
+
+            aps = _build_apertures_for_snap(ID, snap)
+
+            rGas = pdata["r_gas_pkpc"]
+            mGas = pdata["mass_gas_msun"]
+            sfrGas = pdata["sfr_gas_msun_per_yr"]
+
+            rStar = pdata["r_star_pkpc"]
+            mStar = pdata["mass_star_msun"]
+
+            for apinfo in aps:
+                label = apinfo["label"]
+                rap = float(apinfo["aperture_pkpc"])
+
+                if not np.isfinite(rap) or rap <= 0:
+                    continue
+
+                cond_gas = (rGas <= rap)
+                cond_star = (rStar <= rap)
+
+                ngas = int(np.sum(cond_gas))
+                nstar = int(np.sum(cond_star))
+
+                sfr_sum = np.nansum(sfrGas[cond_gas]) if ngas > 0 else 0.0
+                mstar_sum = np.nansum(mStar[cond_star]) if nstar > 0 else 0.0
+
+                if ngas < min_ngas or nstar < min_nstar or mstar_sum <= 0:
+                    log_ssfr = np.nan
+                    log_sfr = np.nan
+                    log_mstar = np.nan
+                else:
+                    log_mstar = np.log10(mstar_sum)
+                    if sfr_sum > 0:
+                        log_sfr = np.log10(sfr_sum)
+                        log_ssfr = np.log10(sfr_sum / mstar_sum)
+                    else:
+                        log_sfr = np.nan
+                        log_ssfr = floor_log10_ssfr
+
+                row = {
+                    "SubfindID_99": ID,
+                    "Snap": snap,
+                    "z": pdata["z"],
+                    "Age_Gyr": _get_snap_age(snap),
+                    "aperture_mode": aperture_mode,
+                    "aperture_label": label,
+                    "aperture_input": apinfo["aperture_input"],
+                    "aperture_pkpc": rap,
+                    "reference_rh_mode": apinfo["reference_rh_mode"],
+                    "reference_rh_pkpc": apinfo["reference_rh_pkpc"],
+                    "radius_floor_pkpc": radius_floor_pkpc if radius_floor_pkpc is not None else np.nan,
+                    "Ngas_total": len(rGas),
+                    "Nstar_total": len(rStar),
+                    "Ngas_in": ngas,
+                    "Nstar_in": nstar,
+                    "SFR_in_Msun_per_yr": sfr_sum,
+                    "Mstar_in_Msun": mstar_sum,
+                    "log_SFR_in": log_sfr,
+                    "log_Mstar_in": log_mstar,
+                    "log_sSFR_in_yrm1": log_ssfr,
+                }
+                rows.append(row)
+
+                if save_wide_tables and label in wide_ssfr:
+                    irow = 99 - snap
+                    wide_ssfr[label].loc[irow, str(ID)] = log_ssfr
+                    wide_sfr[label].loc[irow, str(ID)] = log_sfr
+                    wide_mstar[label].loc[irow, str(ID)] = log_mstar
+                    wide_ap[label].loc[irow, str(ID)] = rap
+
+    # ---------- save ----------
+    df_long = pd.DataFrame(rows)
+
+    if save_long_table and len(df_long) > 0:
+        suffix = aperture_mode
+        if aperture_mode == "fraction_reference_rh":
+            suffix += f"__ref_{reference_rh}"
+            if reference_rh == "mean_z_lt":
+                suffix += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+        if radius_floor_pkpc is not None:
+            suffix += f"__floor{_fmt(radius_floor_pkpc)}pkpc"
+
+        long_path = os.path.join(base_dir, f"sSFR_long__{suffix}.csv")
+        df_long.to_csv(long_path, index=False)
+
+        meta = {
+            "aperture_mode": aperture_mode,
+            "apertures": [float(v) for v in apertures],
+            "reference_rh": reference_rh,
+            "zmax_reference": zmax_reference,
+            "reference_stat": reference_stat,
+            "radius_floor_pkpc": radius_floor_pkpc,
+            "min_ngas": min_ngas,
+            "min_nstar": min_nstar,
+            "floor_log10_ssfr": floor_log10_ssfr,
+        }
+        with open(os.path.join(base_dir, f"sSFR_long__{suffix}.meta.json"), "w") as fmeta:
+            json.dump(meta, fmeta, indent=2)
+
+    if save_wide_tables:
+        for label in wide_ssfr:
+            _save_wide_df(wide_ssfr[label], os.path.join(base_dir, f"log_sSFR__{label}.csv"))
+            _save_wide_df(wide_sfr[label], os.path.join(base_dir, f"log_SFR__{label}.csv"))
+            _save_wide_df(wide_mstar[label], os.path.join(base_dir, f"log_Mstar__{label}.csv"))
+            _save_wide_df(wide_ap[label], os.path.join(base_dir, f"R_ap_pkpc__{label}.csv"))
+
+    return df_long
+
+
+###################################
+
+
+
+def EvolutionParticle_Photometry(
+    IDs,
+    dfSample,
+    Snaps=(11, 17, 25, 33, 40, 44, 50, 59, 67, 78, 81, 84, 88, 91, 95, 99),
+    measure="color",                 # "mag" ou "color"
+    band="r",                        # usado se measure="mag"
+    color_bands=("U", "r"),          # usado se measure="color"
+    aperture_mode="fixed_pkpc",
+    apertures=(1.0,),
+    reference_rh="final",
+    zmax_reference=5.0,
+    reference_stat="mean",
+    radius_floor_pkpc=None,
+    Update=False,
+    NearBirth=False,
+    NearEntryToGasLoss=False,
+    EntrySnap=False,
+    min_nstar=10,
+    allow_mixed_system=True,         # deixa calcular U-r bruto
+    PATH=os.getenv("HOME") + "/TNG_Analyzes/SubhaloHistory",
+    SAVEFILE="DFs",
+    SIM="TNG50",
+    NSim="-1",
+    save_particle_cache=True,
+    use_particle_cache=True,
+    save_long_table=True,
+    save_wide_tables=True,
+    verbose=False,
+):
+    """
+    Mede magnitudes integradas ou cores integradas dentro de aperturas,
+    usando PartType4/GFM_StellarPhotometrics.
+
+    IMPORTANTE:
+    - bandas disponíveis nesse campo: U, B, V, K, g, r, i, z
+    - NÃO existe 'u' minúsculo aqui
+    - U,B,V,K são Vega; g,r,i,z são AB
+    """
+
+    PHOT_BANDS = {"U": 0, "B": 1, "V": 2, "K": 3, "g": 4, "r": 5, "i": 6, "z": 7}
+    PHOT_SYSTEM = {"U": "Vega", "B": "Vega", "V": "Vega", "K": "Vega",
+                   "g": "AB",   "r": "AB",   "i": "AB",   "z": "AB"}
+
+    # ---------- validação ----------
+    if band == "u" or "u" in color_bands:
+        raise ValueError(
+            "GFM_StellarPhotometrics não possui banda 'u'. "
+            "As bandas são: U, B, V, K, g, r, i, z."
+        )
+
+    if measure not in ("mag", "color"):
+        raise ValueError("measure deve ser 'mag' ou 'color'.")
+
+    if measure == "mag" and band not in PHOT_BANDS:
+        raise ValueError(f"Banda inválida: {band}")
+
+    if measure == "color":
+        b1, b2 = color_bands
+        if b1 not in PHOT_BANDS or b2 not in PHOT_BANDS:
+            raise ValueError(f"Bandas inválidas em color_bands={color_bands}")
+
+        mixed_system = (PHOT_SYSTEM[b1] != PHOT_SYSTEM[b2])
+        if mixed_system and not allow_mixed_system:
+            raise ValueError(
+                f"{b1}-{b2} mistura sistemas ({PHOT_SYSTEM[b1]} - {PHOT_SYSTEM[b2]}). "
+                "Use allow_mixed_system=True para permitir isso explicitamente."
+            )
+
+    # ---------- helpers ----------
+    def _fmt(x):
+        s = f"{float(x):.3f}".rstrip("0").rstrip(".")
+        return s.replace(".", "p").replace("-", "m")
+
+    def _mk_outdirs():
+        base = os.path.join(PATH, SIM, SAVEFILE, "Photometry")
+        cache = os.path.join(base, "particle_cache")
+        os.makedirs(base, exist_ok=True)
+        os.makedirs(cache, exist_ok=True)
+        return base, cache
+
+    def _new_wide_df(ids):
+        snaps = np.arange(100)
+        df = pd.DataFrame(data=np.nan, index=np.arange(100), columns=np.append(["Snap"], ids))
+        df["Snap"] = np.flip(snaps)
+        return df
+
+    def _load_wide_df(path, ids):
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            for _id in ids:
+                if str(_id) not in df.columns:
+                    df[str(_id)] = np.nan
+            return df
+        return _new_wide_df(ids)
+
+    def _save_wide_df(df, path):
+        df.to_csv(path, index=False)
+
+    def _subhalo_cache_file(cache_dir, ID, snap):
+        subdir = os.path.join(cache_dir, f"subhalo_{int(ID)}")
+        os.makedirs(subdir, exist_ok=True)
+        return os.path.join(subdir, f"snap_{int(snap):03d}_phot_particles.npz")
+
+    def _get_snap_z(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "z"].values[0])
+
+    def _get_snap_age(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "Age"].values[0])
+
+    def _get_snaps_for_id(ID, snaps_original):
+        snaps_id = np.array(snaps_original, dtype=int)
+
+        if NearBirth:
+            SubfindID = extractDF("SubfindID")
+            IDsSnaps = np.array([subID for subID in SubfindID[str(ID)]])
+            valid = np.argwhere(~np.isnan(IDsSnaps)).T[0]
+            if len(valid) > 0:
+                argBirth = valid[-1]
+                snap_birth = int(99 - argBirth)
+                age_birth = _get_snap_age(snap_birth)
+
+                snaps_at_0 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 0.15) &
+                    (dfTime.Age - age_birth > 0.0) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_at_1 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 1.1) &
+                    (dfTime.Age - age_birth > 0.9) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_id = np.unique(np.concatenate([[snap_birth], snaps_at_0, snaps_at_1])).astype(int)
+
+        if NearEntryToGasLoss:
+            col_entry = "SnapAtEntry_First" if "SnapAtEntry_First" in dfSample.columns else "Snap_At_FirstEntry"
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, col_entry].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 90
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 5, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            if snap_no_gas > snap_before + 10:
+                add_snaps = np.linspace(snap_before, snap_no_gas, 10).astype(int)
+            else:
+                add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+
+            dt = abs(_get_snap_age(snap_no_gas) - _get_snap_age(snap_entry))
+            snap_delta_before = dfTime.Snap.loc[
+                abs(dfTime.Age - _get_snap_age(snap_entry)) < dt
+            ].values
+            snap_delta_before = snap_delta_before[snap_delta_before < snap_entry]
+
+            snaps_id = np.unique(np.concatenate([add_snaps, [snap_before, snap_entry, snap_no_gas], snap_delta_before]))
+            snaps_id = snaps_id[(snaps_id > 0) & (snaps_id < 100)].astype(int)
+
+        if EntrySnap:
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, "Snap_At_FirstEntry"].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 99
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 3, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+            snaps_id = np.unique(np.concatenate([snaps_id, add_snaps])).astype(int)
+
+        return np.unique(snaps_id)
+
+    def _get_final_rh_pkpc(ID):
+        return float(10 ** dfSample.loc[dfSample.SubfindID_99 == ID, "logHalfRadstar_99"].values[0])
+
+    def _get_mean_rh_pkpc_zlt(ID, zmax=5.0, stat="mean"):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        arr_lin = 10 ** arr_log
+        z_arr = np.array(dfTime.z.values, dtype=float)
+
+        m = np.isfinite(arr_lin) & np.isfinite(z_arr) & (z_arr < zmax) & (arr_lin > 0)
+        if np.sum(m) == 0:
+            return np.nan
+
+        if stat == "median":
+            return float(np.nanmedian(arr_lin[m]))
+        return float(np.nanmean(arr_lin[m]))
+
+    def _get_current_rh_pkpc(ID, snap):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        return float(10 ** arr_log[99 - int(snap)])
+
+    def _reference_rh_pkpc(ID):
+        if reference_rh == "final":
+            return _get_final_rh_pkpc(ID)
+        elif reference_rh == "mean_z_lt":
+            return _get_mean_rh_pkpc_zlt(ID, zmax=zmax_reference, stat=reference_stat)
+        else:
+            raise ValueError("reference_rh deve ser 'final' ou 'mean_z_lt'.")
+
+    def _build_apertures_for_snap(ID, snap):
+        if aperture_mode == "fixed_pkpc":
+            aps = []
+            for ap in apertures:
+                aps.append({
+                    "label": f"fixed_{_fmt(ap)}pkpc",
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": np.nan,
+                    "reference_rh_mode": "none",
+                    "aperture_input": float(ap),
+                })
+            return aps
+
+        elif aperture_mode == "fraction_reference_rh":
+            ref = _reference_rh_pkpc(ID)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * ref
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_{reference_rh}"
+                if reference_rh == "mean_z_lt":
+                    lbl += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": float(ref),
+                    "reference_rh_mode": reference_rh,
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        elif aperture_mode == "current_rh":
+            rh_now = _get_current_rh_pkpc(ID, snap)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * rh_now
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_current"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "aperture_pkpc": float(ap),
+                    "reference_rh_pkpc": float(rh_now),
+                    "reference_rh_mode": "current",
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        else:
+            raise ValueError("aperture_mode deve ser 'fixed_pkpc', 'fraction_reference_rh' ou 'current_rh'.")
+
+    def _mag_to_flux(m):
+        return 10.0 ** (-0.4 * m)
+
+    def _flux_to_mag(f):
+        if not np.isfinite(f) or f <= 0:
+            return np.nan
+        return -2.5 * np.log10(f)
+
+    def _integrated_mag(mags_1d):
+        mags_1d = np.asarray(mags_1d, dtype=float)
+        good = np.isfinite(mags_1d)
+        if np.sum(good) == 0:
+            return np.nan
+        flux = np.nansum(_mag_to_flux(mags_1d[good]))
+        return _flux_to_mag(flux)
+
+    def _extract_or_load_particle_cache(ID, snap, cache_dir):
+        cache_file = _subhalo_cache_file(cache_dir, ID, snap)
+
+        if use_particle_cache and os.path.exists(cache_file) and not Update:
+            data = np.load(cache_file, allow_pickle=True)
+            return {
+                "snap": int(data["snap"]),
+                "z": float(data["z"]),
+                "center_pkpc": data["center_pkpc"],
+                "velbulk_kms": data["velbulk_kms"],
+                "star_ids": data["star_ids"],
+                "r_star_pkpc": data["r_star_pkpc"],
+                "mass_star_msun": data["mass_star_msun"],
+                "stellar_form_time": data["stellar_form_time"],
+                "stellar_photometrics": data["stellar_photometrics"],
+            }
+
+        try:
+            f = extractParticles(ID, snaps=[int(snap)])[0]
+        except Exception:
+            return None
+
+        zsnap = _get_snap_z(snap)
+        a_sqrt = np.sqrt(1.0 / (1.0 + zsnap))
+
+        try:
+            star_ids = f["PartType4"]["ParticleIDs"][:]
+            posStar = f["PartType4"]["Coordinates"][:] / (1.0 + zsnap) / h
+            velStar = f["PartType4"]["Velocities"][:] * a_sqrt
+            massStar = f["PartType4"]["Masses"][:] * 1e10 / h
+            formTime = f["PartType4"]["GFM_StellarFormationTime"][:]
+            phot = f["PartType4"]["GFM_StellarPhotometrics"][:]   # shape (N,8)
+        except Exception:
+            return None
+
+        # manter apenas estrelas reais (não wind particles)
+        is_real_star = np.isfinite(formTime) & (formTime > 0)
+
+        star_ids = star_ids[is_real_star]
+        posStar = posStar[is_real_star]
+        velStar = velStar[is_real_star]
+        massStar = massStar[is_real_star]
+        formTime = formTime[is_real_star]
+        phot = phot[is_real_star]
+
+        if len(massStar) == 0:
+            return None
+
+        Cen = np.array([
+            MATH.weighted_median(posStar[:, 0], massStar),
+            MATH.weighted_median(posStar[:, 1], massStar),
+            MATH.weighted_median(posStar[:, 2], massStar),
+        ])
+        VelBulk = np.array([
+            MATH.weighted_median(velStar[:, 0], massStar),
+            MATH.weighted_median(velStar[:, 1], massStar),
+            MATH.weighted_median(velStar[:, 2], massStar),
+        ])
+
+        posStar = ETNG.FixPeriodic(posStar - Cen, sim=SIM + NSim)
+        velStar = velStar - VelBulk
+        rStar = np.linalg.norm(posStar, axis=1)
+
+        out = {
+            "snap": int(snap),
+            "z": float(zsnap),
+            "center_pkpc": Cen.astype(float),
+            "velbulk_kms": VelBulk.astype(float),
+            "star_ids": star_ids,
+            "r_star_pkpc": rStar.astype(float),
+            "mass_star_msun": massStar.astype(float),
+            "stellar_form_time": formTime.astype(float),
+            "stellar_photometrics": phot.astype(float),
+        }
+
+        if save_particle_cache:
+            np.savez_compressed(
+                cache_file,
+                snap=out["snap"],
+                z=out["z"],
+                center_pkpc=out["center_pkpc"],
+                velbulk_kms=out["velbulk_kms"],
+                star_ids=out["star_ids"],
+                r_star_pkpc=out["r_star_pkpc"],
+                mass_star_msun=out["mass_star_msun"],
+                stellar_form_time=out["stellar_form_time"],
+                stellar_photometrics=out["stellar_photometrics"],
+            )
+
+        return out
+
+    # ---------- output prep ----------
+    dfTime.a = 1.0 / (1.0 + dfTime.z)
+    base_dir, cache_dir = _mk_outdirs()
+
+    if measure == "mag":
+        quantity_label = band
+    else:
+        quantity_label = f"{color_bands[0]}-minus-{color_bands[1]}"
+
+    preview_labels = set()
+    if len(IDs) > 0:
+        _id0 = int(IDs[0])
+        for _snap0 in [99]:
+            for d in _build_apertures_for_snap(_id0, _snap0):
+                preview_labels.add(d["label"])
+
+    wide_main = {}
+    if save_wide_tables:
+        for label in sorted(preview_labels):
+            wide_main[label] = _load_wide_df(
+                os.path.join(base_dir, f"{measure}__{quantity_label}__{label}.csv"), IDs
+            )
+
+    rows = []
+
+    # ---------- main loop ----------
+    for ID in IDs:
+        ID = int(ID)
+        snaps_id = _get_snaps_for_id(ID, Snaps)
+
+        if verbose:
+            print(f"ID = {ID} | snaps = {snaps_id}")
+
+        for snap in snaps_id:
+            snap = int(snap)
+            pdata = _extract_or_load_particle_cache(ID, snap, cache_dir)
+            if pdata is None:
+                continue
+
+            aps = _build_apertures_for_snap(ID, snap)
+
+            rStar = pdata["r_star_pkpc"]
+            phot = pdata["stellar_photometrics"]
+
+            for apinfo in aps:
+                label = apinfo["label"]
+                rap = float(apinfo["aperture_pkpc"])
+
+                if not np.isfinite(rap) or rap <= 0:
+                    continue
+
+                cond_star = (rStar <= rap)
+                nstar = int(np.sum(cond_star))
+
+                value = np.nan
+                mag1 = np.nan
+                mag2 = np.nan
+
+                if nstar >= min_nstar:
+                    phot_in = phot[cond_star]
+
+                    if measure == "mag":
+                        ib = PHOT_BANDS[band]
+                        mag1 = _integrated_mag(phot_in[:, ib])
+                        value = mag1
+                    else:
+                        b1, b2 = color_bands
+                        i1 = PHOT_BANDS[b1]
+                        i2 = PHOT_BANDS[b2]
+                        mag1 = _integrated_mag(phot_in[:, i1])
+                        mag2 = _integrated_mag(phot_in[:, i2])
+
+                        if np.isfinite(mag1) and np.isfinite(mag2):
+                            value = mag1 - mag2
+
+                row = {
+                    "SubfindID_99": ID,
+                    "Snap": snap,
+                    "z": pdata["z"],
+                    "Age_Gyr": _get_snap_age(snap),
+                    "aperture_mode": aperture_mode,
+                    "aperture_label": label,
+                    "aperture_input": apinfo["aperture_input"],
+                    "aperture_pkpc": rap,
+                    "reference_rh_mode": apinfo["reference_rh_mode"],
+                    "reference_rh_pkpc": apinfo["reference_rh_pkpc"],
+                    "radius_floor_pkpc": radius_floor_pkpc if radius_floor_pkpc is not None else np.nan,
+                    "Nstar_total": len(rStar),
+                    "Nstar_in": nstar,
+                    "measure": measure,
+                    "system_note": (
+                        PHOT_SYSTEM[band] if measure == "mag"
+                        else f"{PHOT_SYSTEM[color_bands[0]]}-{PHOT_SYSTEM[color_bands[1]]}"
+                    ),
+                    "value": value,
+                }
+
+                if measure == "mag":
+                    row[f"mag_{band}"] = mag1
+                else:
+                    row[f"mag_{color_bands[0]}"] = mag1
+                    row[f"mag_{color_bands[1]}"] = mag2
+                    row[f"{color_bands[0]}_minus_{color_bands[1]}"] = value
+
+                rows.append(row)
+
+                if save_wide_tables and label in wide_main:
+                    irow = 99 - snap
+                    wide_main[label].loc[irow, str(ID)] = value
+
+    # ---------- save ----------
+    df_long = pd.DataFrame(rows)
+
+    if save_long_table and len(df_long) > 0:
+        suffix = aperture_mode
+        if aperture_mode == "fraction_reference_rh":
+            suffix += f"__ref_{reference_rh}"
+            if reference_rh == "mean_z_lt":
+                suffix += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+        if radius_floor_pkpc is not None:
+            suffix += f"__floor{_fmt(radius_floor_pkpc)}pkpc"
+
+        long_path = os.path.join(base_dir, f"{measure}__{quantity_label}__long__{suffix}.csv")
+        df_long.to_csv(long_path, index=False)
+
+        meta = {
+            "measure": measure,
+            "band": band,
+            "color_bands": list(color_bands),
+            "phot_systems": PHOT_SYSTEM,
+            "allow_mixed_system": allow_mixed_system,
+            "aperture_mode": aperture_mode,
+            "apertures": [float(v) for v in apertures],
+            "reference_rh": reference_rh,
+            "zmax_reference": zmax_reference,
+            "reference_stat": reference_stat,
+            "radius_floor_pkpc": radius_floor_pkpc,
+            "min_nstar": min_nstar,
+        }
+        with open(os.path.join(base_dir, f"{measure}__{quantity_label}__long__{suffix}.meta.json"), "w") as fmeta:
+            json.dump(meta, fmeta, indent=2)
+
+    if save_wide_tables:
+        for label in wide_main:
+            _save_wide_df(wide_main[label], os.path.join(base_dir, f"{measure}__{quantity_label}__{label}.csv"))
+
+    return df_long
+
+##################
+
+
+def EvolutionParticle_InnerOuter(
+    IDs,
+    dfSample,
+    Snaps=(11, 17, 25, 33, 40, 44, 50, 59, 67, 78, 81, 84, 88, 91, 95, 99),
+    metrics=("ssfr", "colors"),              # ("ssfr",), ("colors",), or both
+    color_pairs=(("U", "r"),),               # one or more colors
+    aperture_mode="fixed_pkpc",              # fixed_pkpc | fraction_reference_rh | current_rh
+    apertures=(1.0,),                        # thresholds
+    reference_rh="final",                    # final | mean_z_lt
+    zmax_reference=5.0,
+    reference_stat="mean",                   # mean | median
+    radius_floor_pkpc=None,
+    return_global=True,                      # NEW
+    Update=False,
+    NearBirth=False,
+    NearEntryToGasLoss=False,
+    EntrySnap=False,
+    min_ngas=10,
+    min_nstar=10,                            # for sSFR stellar mass
+    min_nphot=10,                            # for colors / magnitudes
+    floor_log10_ssfr=-14.0,
+    photometry_real_stars_only=True,
+    PATH=os.getenv("HOME") + "/TNG_Analyzes/SubhaloHistory",
+    SAVEFILE="DFs",
+    SIM="TNG50",
+    NSim="-1",
+    save_particle_cache=True,
+    use_particle_cache=True,
+    save_long_table=True,
+    save_wide_tables=True,
+    verbose=False,
+):
+    """
+    Unified routine to measure inner/outer quantities around a threshold radius,
+    and optionally the global quantity over all loaded particles in the subhalo.
+
+    Regions:
+        inner  : r <= r_thr
+        outer  : r >  r_thr
+        global : all loaded particles in the corresponding component
+
+    Supported outputs:
+        - sSFR-related: log_SFR, log_Mstar, log_sSFR
+        - photometry  : integrated magnitudes and colors
+
+    Notes:
+        - outer has no upper radial bound in this version.
+        - global is computed once per (ID, snap), independent of aperture.
+        - color_pairs should use the local ordering defined in PHOT_BANDS below.
+        - assumes the same global environment as EvolutionParticle_sSFR:
+          dfTime, extractDF, extractParticles, MATH, ETNG, h
+    """
+
+    # -------------------------
+    # configuration / validation
+    # -------------------------
+    metrics_norm = {m.lower() for m in metrics}
+    do_ssfr = "ssfr" in metrics_norm
+    do_colors = ("color" in metrics_norm) or ("colors" in metrics_norm) or ("photometry" in metrics_norm)
+
+    if not do_ssfr and not do_colors:
+        raise ValueError("metrics must contain at least 'ssfr' or 'colors'.")
+
+    # Assumed local mapping for GFM_StellarPhotometrics
+    PHOT_BANDS = {
+        "U": 0,
+        "B": 1,
+        "V": 2,
+        "K": 3,
+        "g": 4,
+        "r": 5,
+        "i": 6,
+        "z": 7,
+    }
+
+    for pair in color_pairs:
+        if len(pair) != 2:
+            raise ValueError(f"Invalid color pair: {pair}")
+        b1, b2 = pair
+        if b1 not in PHOT_BANDS or b2 not in PHOT_BANDS:
+            raise ValueError(f"Invalid band(s) in color pair {pair}. Valid bands: {list(PHOT_BANDS.keys())}")
+
+    # -------------------------
+    # helpers
+    # -------------------------
+    def _fmt(x):
+        s = f"{float(x):.3f}".rstrip("0").rstrip(".")
+        return s.replace(".", "p").replace("-", "m")
+
+    def _mk_outdirs():
+        base = os.path.join(PATH, SIM, SAVEFILE, "InnerOuter")
+        cache = os.path.join(base, "particle_cache")
+        os.makedirs(base, exist_ok=True)
+        os.makedirs(cache, exist_ok=True)
+        return base, cache
+
+    def _new_wide_df(ids):
+        snaps = np.arange(100)
+        df = pd.DataFrame(data=np.nan, index=np.arange(100), columns=np.append(["Snap"], ids))
+        df["Snap"] = np.flip(snaps)
+        return df
+
+    def _load_wide_df(path, ids):
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            for _id in ids:
+                if str(_id) not in df.columns:
+                    df[str(_id)] = np.nan
+            return df
+        return _new_wide_df(ids)
+
+    def _save_wide_df(df, path):
+        df.to_csv(path, index=False)
+
+    def _subhalo_cache_file(cache_dir, ID, snap):
+        subdir = os.path.join(cache_dir, f"subhalo_{int(ID)}")
+        os.makedirs(subdir, exist_ok=True)
+        return os.path.join(subdir, f"snap_{int(snap):03d}_innerouter_particles.npz")
+
+    def _get_snap_z(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "z"].values[0])
+
+    def _get_snap_age(snap):
+        return float(dfTime.loc[dfTime.Snap == int(snap), "Age"].values[0])
+
+    def _get_snaps_for_id(ID, snaps_original):
+        snaps_id = np.array(snaps_original, dtype=int)
+
+        if NearBirth:
+            SubfindID = extractDF("SubfindID")
+            IDsSnaps = np.array([subID for subID in SubfindID[str(ID)]])
+            valid = np.argwhere(~np.isnan(IDsSnaps)).T[0]
+            if len(valid) > 0:
+                argBirth = valid[-1]
+                snap_birth = int(99 - argBirth)
+                age_birth = _get_snap_age(snap_birth)
+
+                snaps_at_0 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 0.15) &
+                    (dfTime.Age - age_birth > 0.0) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_at_1 = dfTime.Snap.loc[
+                    (dfTime.Age - age_birth < 1.1) &
+                    (dfTime.Age - age_birth > 0.9) &
+                    (dfTime.Snap > snap_birth)
+                ].values
+
+                snaps_id = np.unique(np.concatenate([[snap_birth], snaps_at_0, snaps_at_1])).astype(int)
+
+        if NearEntryToGasLoss:
+            col_entry = "SnapAtEntry_First" if "SnapAtEntry_First" in dfSample.columns else "Snap_At_FirstEntry"
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, col_entry].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 90
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 5, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            if snap_no_gas > snap_before + 10:
+                add_snaps = np.linspace(snap_before, snap_no_gas, 10).astype(int)
+            else:
+                add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+
+            dt = abs(_get_snap_age(snap_no_gas) - _get_snap_age(snap_entry))
+            snap_delta_before = dfTime.Snap.loc[
+                abs(dfTime.Age - _get_snap_age(snap_entry)) < dt
+            ].values
+            snap_delta_before = snap_delta_before[snap_delta_before < snap_entry]
+
+            snaps_id = np.unique(np.concatenate([add_snaps, [snap_before, snap_entry, snap_no_gas], snap_delta_before]))
+            snaps_id = snaps_id[(snaps_id > 0) & (snaps_id < 100)].astype(int)
+
+        if EntrySnap:
+            snap_entry = dfSample.loc[dfSample.SubfindID_99 == ID, "Snap_At_FirstEntry"].values[0]
+            snap_no_gas = dfSample.loc[dfSample.SubfindID_99 == ID, "SnapLostGas"].values[0]
+
+            if np.isnan(snap_entry):
+                snap_entry = 99
+            snap_entry = int(snap_entry)
+
+            snap_before = max(snap_entry - 3, 0)
+
+            if np.isnan(snap_no_gas) or snap_no_gas == -1:
+                snap_no_gas = 99
+            snap_no_gas = int(snap_no_gas)
+
+            add_snaps = np.arange(snap_before, snap_no_gas + 1).astype(int)
+            snaps_id = np.unique(np.concatenate([snaps_id, add_snaps])).astype(int)
+
+        return np.unique(snaps_id)
+
+    def _get_final_rh_pkpc(ID):
+        return float(10 ** dfSample.loc[dfSample.SubfindID_99 == ID, "logHalfRadstar_99"].values[0])
+
+    def _get_mean_rh_pkpc_zlt(ID, zmax=5.0, stat="mean"):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        arr_lin = 10 ** arr_log
+        z_arr = np.array(dfTime.z.values, dtype=float)
+
+        m = np.isfinite(arr_lin) & np.isfinite(z_arr) & (z_arr < zmax) & (arr_lin > 0)
+        if np.sum(m) == 0:
+            return np.nan
+
+        if stat == "median":
+            return float(np.nanmedian(arr_lin[m]))
+        return float(np.nanmean(arr_lin[m]))
+
+    def _get_current_rh_pkpc(ID, snap):
+        SubhaloHalfmassRadType4 = extractDF("SubhaloHalfmassRadType4")
+        arr_log = np.array(SubhaloHalfmassRadType4[str(ID)].values, dtype=float)
+        return float(10 ** arr_log[99 - int(snap)])
+
+    def _reference_rh_pkpc(ID):
+        if reference_rh == "final":
+            return _get_final_rh_pkpc(ID)
+        elif reference_rh == "mean_z_lt":
+            return _get_mean_rh_pkpc_zlt(ID, zmax=zmax_reference, stat=reference_stat)
+        else:
+            raise ValueError("reference_rh must be 'final' or 'mean_z_lt'.")
+
+    def _build_apertures_for_snap(ID, snap):
+        if aperture_mode == "fixed_pkpc":
+            aps = []
+            for ap in apertures:
+                aps.append({
+                    "label": f"fixed_{_fmt(ap)}pkpc",
+                    "threshold_pkpc": float(ap),
+                    "reference_rh_pkpc": np.nan,
+                    "reference_rh_mode": "none",
+                    "aperture_input": float(ap),
+                })
+            return aps
+
+        elif aperture_mode == "fraction_reference_rh":
+            ref = _reference_rh_pkpc(ID)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * ref
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_{reference_rh}"
+                if reference_rh == "mean_z_lt":
+                    lbl += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "threshold_pkpc": float(ap),
+                    "reference_rh_pkpc": float(ref),
+                    "reference_rh_mode": reference_rh,
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        elif aperture_mode == "current_rh":
+            rh_now = _get_current_rh_pkpc(ID, snap)
+            aps = []
+            for frac in apertures:
+                ap = float(frac) * rh_now
+                if radius_floor_pkpc is not None and np.isfinite(ap):
+                    ap = max(ap, float(radius_floor_pkpc))
+                lbl = f"{_fmt(frac)}xRh_current"
+                if radius_floor_pkpc is not None:
+                    lbl += f"_floor{_fmt(radius_floor_pkpc)}pkpc"
+
+                aps.append({
+                    "label": lbl,
+                    "threshold_pkpc": float(ap),
+                    "reference_rh_pkpc": float(rh_now),
+                    "reference_rh_mode": "current",
+                    "aperture_input": float(frac),
+                })
+            return aps
+
+        else:
+            raise ValueError("aperture_mode must be 'fixed_pkpc', 'fraction_reference_rh', or 'current_rh'.")
+
+    def _mag_to_flux(m):
+        return 10.0 ** (-0.4 * m)
+
+    def _flux_to_mag(f):
+        if not np.isfinite(f) or f <= 0:
+            return np.nan
+        return -2.5 * np.log10(f)
+
+    def _integrated_mag(mags_1d):
+        mags_1d = np.asarray(mags_1d, dtype=float)
+        good = np.isfinite(mags_1d)
+        if np.sum(good) == 0:
+            return np.nan
+        flux = np.nansum(_mag_to_flux(mags_1d[good]))
+        return _flux_to_mag(flux)
+
+    def _extract_or_load_particle_cache(ID, snap, cache_dir):
+        cache_file = _subhalo_cache_file(cache_dir, ID, snap)
+
+        if use_particle_cache and os.path.exists(cache_file) and not Update:
+            data = np.load(cache_file, allow_pickle=True)
+            return {
+                "snap": int(data["snap"]),
+                "z": float(data["z"]),
+                "center_pkpc": data["center_pkpc"],
+                "velbulk_kms": data["velbulk_kms"],
+                "gas_ids": data["gas_ids"],
+                "r_gas_pkpc": data["r_gas_pkpc"],
+                "mass_gas_msun": data["mass_gas_msun"],
+                "sfr_gas_msun_per_yr": data["sfr_gas_msun_per_yr"],
+                "star_ids": data["star_ids"],
+                "r_star_pkpc": data["r_star_pkpc"],
+                "mass_star_msun": data["mass_star_msun"],
+                "phot_star_ids": data["phot_star_ids"],
+                "r_phot_pkpc": data["r_phot_pkpc"],
+                "stellar_photometrics": data["stellar_photometrics"],
+            }
+
+        try:
+            f = extractParticles(ID, snaps=[int(snap)])[0]
+        except Exception:
+            return None
+
+        zsnap = _get_snap_z(snap)
+        a_sqrt = np.sqrt(1.0 / (1.0 + zsnap))
+
+        # Gas
+        try:
+            gas_ids = f["PartType0"]["ParticleIDs"][:]
+            posGas = f["PartType0"]["Coordinates"][:] / (1.0 + zsnap) / h
+            velGas = f["PartType0"]["Velocities"][:] * a_sqrt
+            massGas = f["PartType0"]["Masses"][:] * 1e10 / h
+            sfrGas = f["PartType0"]["StarFormationRate"][:]
+        except Exception:
+            gas_ids = np.array([], dtype=np.int64)
+            posGas = np.empty((0, 3), dtype=float)
+            velGas = np.empty((0, 3), dtype=float)
+            massGas = np.array([], dtype=float)
+            sfrGas = np.array([], dtype=float)
+
+        # PartType4 for sSFR-like stellar mass
+        try:
+            star_ids = f["PartType4"]["ParticleIDs"][:]
+            posStar = f["PartType4"]["Coordinates"][:] / (1.0 + zsnap) / h
+            velStar = f["PartType4"]["Velocities"][:] * a_sqrt
+            massStar = f["PartType4"]["Masses"][:] * 1e10 / h
+        except Exception:
+            star_ids = np.array([], dtype=np.int64)
+            posStar = np.empty((0, 3), dtype=float)
+            velStar = np.empty((0, 3), dtype=float)
+            massStar = np.array([], dtype=float)
+
+        # Extra fields for photometry
+        try:
+            starFormTime = f["PartType4"]["GFM_StellarFormationTime"][:]
+            stellarPhot = f["PartType4"]["GFM_StellarPhotometrics"][:]
+        except Exception:
+            starFormTime = np.array([], dtype=float)
+            stellarPhot = np.empty((0, len(PHOT_BANDS)), dtype=float)
+
+        # center on stars first, then gas
+        if len(massStar) > 0:
+            Cen = np.array([
+                MATH.weighted_median(posStar[:, 0], massStar),
+                MATH.weighted_median(posStar[:, 1], massStar),
+                MATH.weighted_median(posStar[:, 2], massStar),
+            ])
+            VelBulk = np.array([
+                MATH.weighted_median(velStar[:, 0], massStar),
+                MATH.weighted_median(velStar[:, 1], massStar),
+                MATH.weighted_median(velStar[:, 2], massStar),
+            ])
+        elif len(massGas) > 0:
+            Cen = np.array([
+                MATH.weighted_median(posGas[:, 0], massGas),
+                MATH.weighted_median(posGas[:, 1], massGas),
+                MATH.weighted_median(posGas[:, 2], massGas),
+            ])
+            VelBulk = np.array([
+                MATH.weighted_median(velGas[:, 0], massGas),
+                MATH.weighted_median(velGas[:, 1], massGas),
+                MATH.weighted_median(velGas[:, 2], massGas),
+            ])
+        else:
+            return None
+
+        if len(posGas) > 0:
+            posGas = ETNG.FixPeriodic(posGas - Cen, sim=SIM + NSim)
+            velGas = velGas - VelBulk
+            rGas = np.linalg.norm(posGas, axis=1)
+        else:
+            rGas = np.array([], dtype=float)
+
+        if len(posStar) > 0:
+            posStar = ETNG.FixPeriodic(posStar - Cen, sim=SIM + NSim)
+            velStar = velStar - VelBulk
+            rStar = np.linalg.norm(posStar, axis=1)
+        else:
+            rStar = np.array([], dtype=float)
+
+        # Photometric subset
+        if len(stellarPhot) == len(rStar) and len(rStar) > 0:
+            if photometry_real_stars_only and len(starFormTime) == len(rStar):
+                mphot = np.isfinite(starFormTime) & (starFormTime > 0)
+            else:
+                mphot = np.ones(len(rStar), dtype=bool)
+
+            phot_star_ids = star_ids[mphot]
+            rPhot = rStar[mphot]
+            stellarPhot_use = stellarPhot[mphot]
+        else:
+            phot_star_ids = np.array([], dtype=np.int64)
+            rPhot = np.array([], dtype=float)
+            stellarPhot_use = np.empty((0, len(PHOT_BANDS)), dtype=float)
+
+        out = {
+            "snap": int(snap),
+            "z": float(zsnap),
+            "center_pkpc": Cen.astype(float),
+            "velbulk_kms": VelBulk.astype(float),
+            "gas_ids": gas_ids,
+            "r_gas_pkpc": rGas.astype(float),
+            "mass_gas_msun": massGas.astype(float),
+            "sfr_gas_msun_per_yr": sfrGas.astype(float),
+            "star_ids": star_ids,
+            "r_star_pkpc": rStar.astype(float),
+            "mass_star_msun": massStar.astype(float),
+            "phot_star_ids": phot_star_ids,
+            "r_phot_pkpc": rPhot.astype(float),
+            "stellar_photometrics": stellarPhot_use.astype(float),
+        }
+
+        if save_particle_cache:
+            np.savez_compressed(
+                cache_file,
+                snap=out["snap"],
+                z=out["z"],
+                center_pkpc=out["center_pkpc"],
+                velbulk_kms=out["velbulk_kms"],
+                gas_ids=out["gas_ids"],
+                r_gas_pkpc=out["r_gas_pkpc"],
+                mass_gas_msun=out["mass_gas_msun"],
+                sfr_gas_msun_per_yr=out["sfr_gas_msun_per_yr"],
+                star_ids=out["star_ids"],
+                r_star_pkpc=out["r_star_pkpc"],
+                mass_star_msun=out["mass_star_msun"],
+                phot_star_ids=out["phot_star_ids"],
+                r_phot_pkpc=out["r_phot_pkpc"],
+                stellar_photometrics=out["stellar_photometrics"],
+            )
+
+        return out
+
+    def _region_masks(radii, rthr):
+        return {
+            "inner": (radii <= rthr),
+            "outer": (radii > rthr),
+        }
+
+    # -------------------------
+    # output prep
+    # -------------------------
+    dfTime.a = 1.0 / (1.0 + dfTime.z)
+    base_dir, cache_dir = _mk_outdirs()
+
+    preview_labels = set()
+    if len(IDs) > 0:
+        _id0 = int(IDs[0])
+        for d in _build_apertures_for_snap(_id0, 99):
+            preview_labels.add(d["label"])
+
+    wide_tables = {}
+    if save_wide_tables:
+        quantity_keys = []
+
+        # aperture-dependent tables
+        for label in sorted(preview_labels):
+            for region in ("inner", "outer"):
+                if do_ssfr:
+                    quantity_keys.extend([
+                        f"log_sSFR__{label}__{region}",
+                        f"log_SFR__{label}__{region}",
+                        f"log_Mstar__{label}__{region}",
+                    ])
+                if do_colors:
+                    for b1, b2 in color_pairs:
+                        ctag = f"{b1}_minus_{b2}"
+                        quantity_keys.extend([
+                            f"mag_{b1}__{label}__{region}",
+                            f"mag_{b2}__{label}__{region}",
+                            f"color_{ctag}__{label}__{region}",
+                        ])
+
+        # global tables
+        if return_global:
+            if do_ssfr:
+                quantity_keys.extend([
+                    "log_sSFR__global",
+                    "log_SFR__global",
+                    "log_Mstar__global",
+                ])
+            if do_colors:
+                for b1, b2 in color_pairs:
+                    ctag = f"{b1}_minus_{b2}"
+                    quantity_keys.extend([
+                        f"mag_{b1}__global",
+                        f"mag_{b2}__global",
+                        f"color_{ctag}__global",
+                    ])
+
+        for key in quantity_keys:
+            wide_tables[key] = _load_wide_df(os.path.join(base_dir, f"{key}.csv"), IDs)
+
+    # -------------------------
+    # main loop
+    # -------------------------
+    rows = []
+
+    for ID in IDs:
+        ID = int(ID)
+        snaps_id = _get_snaps_for_id(ID, Snaps)
+
+        if verbose:
+            print(f"ID = {ID} | snaps = {snaps_id}")
+
+        for snap in snaps_id:
+            snap = int(snap)
+            pdata = _extract_or_load_particle_cache(ID, snap, cache_dir)
+            if pdata is None:
+                continue
+
+            aps = _build_apertures_for_snap(ID, snap)
+
+            rGas = pdata["r_gas_pkpc"]
+            mGas = pdata["mass_gas_msun"]
+            sfrGas = pdata["sfr_gas_msun_per_yr"]
+
+            rStar = pdata["r_star_pkpc"]
+            mStar = pdata["mass_star_msun"]
+
+            rPhot = pdata["r_phot_pkpc"]
+            stellarPhot = pdata["stellar_photometrics"]
+
+            # -------------------------
+            # global block (computed once per ID,snap)
+            # -------------------------
+            if return_global:
+                row_global = {
+                    "SubfindID_99": ID,
+                    "Snap": snap,
+                    "z": pdata["z"],
+                    "Age_Gyr": _get_snap_age(snap),
+                    "aperture_mode": "global",
+                    "aperture_label": "global",
+                    "aperture_input": np.nan,
+                    "threshold_pkpc": np.nan,
+                    "reference_rh_mode": "global",
+                    "reference_rh_pkpc": np.nan,
+                    "radius_floor_pkpc": np.nan,
+                    "region": "global",
+                    "Ngas_total": len(rGas),
+                    "Nstar_total": len(rStar),
+                    "Nphot_total": len(rPhot),
+                }
+
+                if do_ssfr:
+                    cond_gas = np.ones(len(rGas), dtype=bool)
+                    cond_star = np.ones(len(rStar), dtype=bool)
+
+                    ngas = int(np.sum(cond_gas))
+                    nstar = int(np.sum(cond_star))
+
+                    sfr_sum = np.nansum(sfrGas[cond_gas]) if ngas > 0 else 0.0
+                    mstar_sum = np.nansum(mStar[cond_star]) if nstar > 0 else 0.0
+
+                    if ngas < min_ngas or nstar < min_nstar or mstar_sum <= 0:
+                        log_ssfr = np.nan
+                        log_sfr = np.nan
+                        log_mstar = np.nan
+                    else:
+                        log_mstar = np.log10(mstar_sum)
+                        if sfr_sum > 0:
+                            log_sfr = np.log10(sfr_sum)
+                            log_ssfr = np.log10(sfr_sum / mstar_sum)
+                        else:
+                            log_sfr = np.nan
+                            log_ssfr = floor_log10_ssfr
+
+                    row_global["Ngas_region"] = ngas
+                    row_global["Nstar_region"] = nstar
+                    row_global["SFR_region_Msun_per_yr"] = sfr_sum
+                    row_global["Mstar_region_Msun"] = mstar_sum
+                    row_global["log_SFR_region"] = log_sfr
+                    row_global["log_Mstar_region"] = log_mstar
+                    row_global["log_sSFR_region_yrm1"] = log_ssfr
+
+                    if save_wide_tables:
+                        irow = 99 - snap
+                        wide_tables["log_sSFR__global"].loc[irow, str(ID)] = log_ssfr
+                        wide_tables["log_SFR__global"].loc[irow, str(ID)] = log_sfr
+                        wide_tables["log_Mstar__global"].loc[irow, str(ID)] = log_mstar
+
+                if do_colors:
+                    cond_phot = np.ones(len(rPhot), dtype=bool)
+                    nphot = int(np.sum(cond_phot))
+                    row_global["Nphot_region"] = nphot
+
+                    for b1, b2 in color_pairs:
+                        ib1 = PHOT_BANDS[b1]
+                        ib2 = PHOT_BANDS[b2]
+                        ctag = f"{b1}_minus_{b2}"
+
+                        mag1 = np.nan
+                        mag2 = np.nan
+                        color = np.nan
+
+                        if nphot >= min_nphot:
+                            mag1 = _integrated_mag(stellarPhot[cond_phot, ib1])
+                            mag2 = _integrated_mag(stellarPhot[cond_phot, ib2])
+
+                            if np.isfinite(mag1) and np.isfinite(mag2):
+                                color = mag1 - mag2
+
+                        row_global[f"mag_{b1}"] = mag1
+                        row_global[f"mag_{b2}"] = mag2
+                        row_global[f"color_{ctag}"] = color
+
+                        if save_wide_tables:
+                            irow = 99 - snap
+                            wide_tables[f"mag_{b1}__global"].loc[irow, str(ID)] = mag1
+                            wide_tables[f"mag_{b2}__global"].loc[irow, str(ID)] = mag2
+                            wide_tables[f"color_{ctag}__global"].loc[irow, str(ID)] = color
+
+                rows.append(row_global)
+
+            # -------------------------
+            # aperture-dependent inner/outer blocks
+            # -------------------------
+            for apinfo in aps:
+                label = apinfo["label"]
+                rthr = float(apinfo["threshold_pkpc"])
+
+                if not np.isfinite(rthr) or rthr <= 0:
+                    continue
+
+                gas_masks = _region_masks(rGas, rthr)
+                star_masks = _region_masks(rStar, rthr)
+                phot_masks = _region_masks(rPhot, rthr)
+
+                for region in ("inner", "outer"):
+                    row = {
+                        "SubfindID_99": ID,
+                        "Snap": snap,
+                        "z": pdata["z"],
+                        "Age_Gyr": _get_snap_age(snap),
+                        "aperture_mode": aperture_mode,
+                        "aperture_label": label,
+                        "aperture_input": apinfo["aperture_input"],
+                        "threshold_pkpc": rthr,
+                        "reference_rh_mode": apinfo["reference_rh_mode"],
+                        "reference_rh_pkpc": apinfo["reference_rh_pkpc"],
+                        "radius_floor_pkpc": radius_floor_pkpc if radius_floor_pkpc is not None else np.nan,
+                        "region": region,
+                        "Ngas_total": len(rGas),
+                        "Nstar_total": len(rStar),
+                        "Nphot_total": len(rPhot),
+                    }
+
+                    # -------------------------
+                    # sSFR block
+                    # -------------------------
+                    if do_ssfr:
+                        cond_gas = gas_masks[region]
+                        cond_star = star_masks[region]
+
+                        ngas = int(np.sum(cond_gas))
+                        nstar = int(np.sum(cond_star))
+
+                        sfr_sum = np.nansum(sfrGas[cond_gas]) if ngas > 0 else 0.0
+                        mstar_sum = np.nansum(mStar[cond_star]) if nstar > 0 else 0.0
+
+                        if ngas < min_ngas or nstar < min_nstar or mstar_sum <= 0:
+                            log_ssfr = np.nan
+                            log_sfr = np.nan
+                            log_mstar = np.nan
+                        else:
+                            log_mstar = np.log10(mstar_sum)
+                            if sfr_sum > 0:
+                                log_sfr = np.log10(sfr_sum)
+                                log_ssfr = np.log10(sfr_sum / mstar_sum)
+                            else:
+                                log_sfr = np.nan
+                                log_ssfr = floor_log10_ssfr
+
+                        row["Ngas_region"] = ngas
+                        row["Nstar_region"] = nstar
+                        row["SFR_region_Msun_per_yr"] = sfr_sum
+                        row["Mstar_region_Msun"] = mstar_sum
+                        row["log_SFR_region"] = log_sfr
+                        row["log_Mstar_region"] = log_mstar
+                        row["log_sSFR_region_yrm1"] = log_ssfr
+
+                        if save_wide_tables:
+                            irow = 99 - snap
+                            wide_tables[f"log_sSFR__{label}__{region}"].loc[irow, str(ID)] = log_ssfr
+                            wide_tables[f"log_SFR__{label}__{region}"].loc[irow, str(ID)] = log_sfr
+                            wide_tables[f"log_Mstar__{label}__{region}"].loc[irow, str(ID)] = log_mstar
+
+                    # -------------------------
+                    # photometry / colors block
+                    # -------------------------
+                    if do_colors:
+                        cond_phot = phot_masks[region]
+                        nphot = int(np.sum(cond_phot))
+                        row["Nphot_region"] = nphot
+
+                        for b1, b2 in color_pairs:
+                            ib1 = PHOT_BANDS[b1]
+                            ib2 = PHOT_BANDS[b2]
+                            ctag = f"{b1}_minus_{b2}"
+
+                            mag1 = np.nan
+                            mag2 = np.nan
+                            color = np.nan
+
+                            if nphot >= min_nphot:
+                                mag1 = _integrated_mag(stellarPhot[cond_phot, ib1])
+                                mag2 = _integrated_mag(stellarPhot[cond_phot, ib2])
+
+                                if np.isfinite(mag1) and np.isfinite(mag2):
+                                    color = mag1 - mag2
+
+                            row[f"mag_{b1}"] = mag1
+                            row[f"mag_{b2}"] = mag2
+                            row[f"color_{ctag}"] = color
+
+                            if save_wide_tables:
+                                irow = 99 - snap
+                                wide_tables[f"mag_{b1}__{label}__{region}"].loc[irow, str(ID)] = mag1
+                                wide_tables[f"mag_{b2}__{label}__{region}"].loc[irow, str(ID)] = mag2
+                                wide_tables[f"color_{ctag}__{label}__{region}"].loc[irow, str(ID)] = color
+
+                    rows.append(row)
+
+    # -------------------------
+    # save
+    # -------------------------
+    df_long = pd.DataFrame(rows)
+
+    if save_long_table and len(df_long) > 0:
+        suffix = aperture_mode
+        if aperture_mode == "fraction_reference_rh":
+            suffix += f"__ref_{reference_rh}"
+            if reference_rh == "mean_z_lt":
+                suffix += f"_zlt{_fmt(zmax_reference)}_{reference_stat}"
+        if radius_floor_pkpc is not None:
+            suffix += f"__floor{_fmt(radius_floor_pkpc)}pkpc"
+        if return_global:
+            suffix += "__withglobal"
+
+        long_path = os.path.join(base_dir, f"InnerOuter_long__{suffix}.csv")
+        df_long.to_csv(long_path, index=False)
+
+        meta = {
+            "metrics": sorted(list(metrics_norm)),
+            "color_pairs": [list(v) for v in color_pairs],
+            "aperture_mode": aperture_mode,
+            "apertures": [float(v) for v in apertures],
+            "reference_rh": reference_rh,
+            "zmax_reference": zmax_reference,
+            "reference_stat": reference_stat,
+            "radius_floor_pkpc": radius_floor_pkpc,
+            "return_global": return_global,
+            "regions": ["inner", "outer", "global"] if return_global else ["inner", "outer"],
+            "definition_inner": "r <= r_thr",
+            "definition_outer": "r > r_thr",
+            "definition_global": "all loaded particles in the corresponding component" if return_global else None,
+            "min_ngas": min_ngas,
+            "min_nstar": min_nstar,
+            "min_nphot": min_nphot,
+            "floor_log10_ssfr": floor_log10_ssfr,
+            "photometry_real_stars_only": photometry_real_stars_only,
+        }
+        with open(os.path.join(base_dir, f"InnerOuter_long__{suffix}.meta.json"), "w") as fmeta:
+            json.dump(meta, fmeta, indent=2)
+
+    if save_wide_tables:
+        for key, dfw in wide_tables.items():
+            _save_wide_df(dfw, os.path.join(base_dir, f"{key}.csv"))
+
+    return df_long
