@@ -834,8 +834,9 @@ labels = {
     'sSFRCoreRatio': r'$\mathrm{sSFR}_{r < r_{1/2}} / \mathrm{sSFR}_{r > r_{1/2}}$',
     'sSFR_Ratio_07_5_pkpc': r'$\mathrm{sSFR}_{r < 0.7 \, \mathrm{kpc}} / \mathrm{sSFR}_{r < 5 \, \mathrm{kpc}}$',
     'sSFR_Ratio_05_2p5_pkpc': r'$\mathrm{sSFR}_{r < 0.5  \mathrm{\,kpc}} / \mathrm{sSFR}_{r < 2.5 \mathrm{\,kpc}}$',
+    'SubhalosSFRInHalfRad': r'$\log(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr}^{-1})$',
 
-    'sSFRinHalfRadAfterz5': r'$\overline{\log{(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr^{-1}})}}_{z < 5}$',
+    'log_sSFR__fixed_0p5pkpc': r'$\log{(\mathrm{sSFR}_{r < 0.5  \mathrm{\,kpc}}/\mathrm{yr^{-1}})}$',
 
     'sSFR_In_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
     'sSFR_Above_Rhpkpc': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
@@ -898,7 +899,7 @@ labels = {
     'LBTimeIntermediateMerger': 'Lookback time \n Intermediate Merger [Gyr]',
     
     'z_At_FinalEntry':  r'$z_{\mathrm{infall}}$ in final host',
-    'z_At_FirstEntry':  r'$z_{\rm entry} \, \mathrm{(first\ host)}$',
+    'z_At_FirstEntry':  r'$z_{\rm entry}$',
     'SnapLostGas': 'Gas loss lookback time  [Gyr]', #$M_\mathrm{gas} = 0$',
 
     'z_Birth': r'$z_\mathrm{birth}$',

@@ -2018,10 +2018,10 @@ def PlotScatter(
 
                 cb.ax.set_yticklabels(['-0.7', '-0.6', '-0.5', '-0.4', '-0.3', '-0.2', '-0.1', '0'])
                 
-            elif COLORBAR[0]  in ["z_At_FirstEntry"]:
-                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0.4, 0.8], pad=0.02, aspect=(ratioColorbar or 50))
+            # elif COLORBAR[0]  in ["z_At_FirstEntry"]:
+            #     cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0.4, 0.8, 1.0, 1.2, 1.], pad=0.02, aspect=(ratioColorbar or 50))
 
-                cb.ax.set_yticklabels(['0.4', '0.8'])
+            #     cb.ax.set_yticklabels(['0.4', '0.8'])
                 
             else:
                 cb = fig.colorbar(mappable, ax=axs.ravel().tolist(), pad=0.02, aspect=(ratioColorbar or 50))
