@@ -276,8 +276,8 @@ BASE_colors = {
         'NormalGamaColor': 'navajowhite', 
         'GAMAColor': 'crimson', 
         
-        'SatelliteDMrich':  'blue',
-        'SatelliteDMpoor':  'red',
+        'SatelliteDMrich':  '#9467BD',
+        'SatelliteDMpoor':  '#8C564B',
         'SatelliteNotInteract':  'blue',
         'SatelliteInteract':  'red',
         'Central':  'black',
@@ -295,8 +295,8 @@ BASE_colors = {
         'DiffuseCentralError': 'tab:red',
         'SubDiffuseCentralError': 'tab:purple',
 
-        'SatelliteDMrichError':  'tab:blue',
-        'SatelliteDMpoorError':  'tab:red',
+        'SatelliteDMrichError':  'tab:purple',
+        'SatelliteDMpoorError':  'tab:brown',
         'SatelliteNotInteractError':  'tab:blue',
         'SatelliteInteractError':   'tab:red',
         'CentralError':  'gray',
@@ -366,10 +366,10 @@ BASE_lines = {
         #Special classes
 
         'SatelliteDMrich': 'solid',
-        'SatelliteDMpoor': (0, (10,4)),
+        'SatelliteDMpoor': (0, (10, 4)),
         'DMrich': 'solid',
         'DMpoor':  (0, (10, 8)),
-        'Central': (0, (10, 4)),
+        'Central': (0, (10, 8)),
         'WithoutBH': (0, (10, 8)),
         'WithBH': 'solid',
         
@@ -426,7 +426,7 @@ BASE_scales = {
     #ExSitu
     'MassExNormalize':  'log',
     'MassExNormalizeAll':  'log',
-    
+    'Frac_ExSitu': 'log',
     #Group
     'GroupNsubsFinalGroup':  'log',
     'rOverR200Min': 'log',
@@ -440,7 +440,7 @@ BASE_scales = {
     #Others
     
     'z_Birth': 'log',
-
+    
     
     None: 'linear'
 }
@@ -795,8 +795,8 @@ labels = {
     
     'deltaSize_at_Entry':  r'$[(r_{{1/2}} -\left<r_{{1/2}}\right>) / \sigma_{r_{{1/2}}}]^{\mathrm{entry}}$ ',
     
-    'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{isp}} - r_{1/2, z_\mathrm{entry}})/  r_{1/2, z_\mathrm{entry}}$',
-    'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{ts}} - r_{1/2, z_\mathrm{entry}}) / r_{1/2, z_\mathrm{entry}}$',
+    'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{iSP}} - r_{1/2, z_\mathrm{entry}})/  r_{1/2, z_\mathrm{entry}}$',
+    'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry': r'$(r_{1/2,\; \mathrm{oSP}} - r_{1/2, z_\mathrm{entry}}) / r_{1/2, z_\mathrm{entry}}$',
 
 
     #Masses
@@ -835,6 +835,7 @@ labels = {
     'sSFR_Ratio_07_5_pkpc': r'$\mathrm{sSFR}_{r < 0.7 \, \mathrm{kpc}} / \mathrm{sSFR}_{r < 5 \, \mathrm{kpc}}$',
     'sSFR_Ratio_05_2p5_pkpc': r'$\mathrm{sSFR}_{r < 0.5  \mathrm{\,kpc}} / \mathrm{sSFR}_{r < 2.5 \mathrm{\,kpc}}$',
     'SubhalosSFRInHalfRad': r'$\log(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr}^{-1})$',
+    'sSFRinHalfRadAfterz5': r'$\overline{\log{(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr^{-1}})}}_{z < 5}$',
 
     'log_sSFR__fixed_0p5pkpc': r'$\log{(\mathrm{sSFR}_{r < 0.5  \mathrm{\,kpc}}/\mathrm{yr^{-1}})}$',
 
@@ -857,7 +858,7 @@ labels = {
     
     'Frac_ExSitu': r'$(M_{\mathrm{ex-situ}} / M_{\star})$',
     
-    'StellarMassExSitu': r'$\log(M_{\mathrm{ex-situ,\; merger}}/\mathrm{M}_\odot)$',
+    'StellarMassExSitu': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
 
     'StellarMassExSituMinor': r'$\log(M_{\mathrm{ex-situ,\; minor\; merger}}/\mathrm{M}_\odot)$',
     'StellarMassExSituIntermediate': r'$\log(M_{\mathrm{ex-situ,\; intermediate\; merger}}/\mathrm{M}_\odot)$',

@@ -230,7 +230,7 @@ def _scatter_with_colorbar(
         # )
         
         sc = ax.scatter(x, y, c=color_values, edgecolor='k',
-                        alpha=alpha_scatter, lw=0.9, marker=marker, s=size,
+                        alpha=alpha_scatter, lw=0.6, marker=marker, s=size,
                         cmap=cmap, vmin=0, vmax=1.5)
         return sc, norm_for_colorbar
     

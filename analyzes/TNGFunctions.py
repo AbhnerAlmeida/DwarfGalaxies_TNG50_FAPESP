@@ -5239,21 +5239,41 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
             return [0], [np.nan], [np.nan]
 
     try:
-        pos = posStar = file['PartType4']['Coordinates'][:] * factor
-        mass = massStar = file['PartType4']['Masses'][:] * 1e10 / h
-        vel = velStar = file['PartType4']['Velocities'][:] * scalefactorsqrt
-        
-        JStar = massStar[:, np.newaxis]*(np.cross(posStar, velStar))
-
-        Cen = np.array([MATH.weighted_median(posStar[:, 0], massStar), MATH.weighted_median(posStar[:, 1], massStar), MATH.weighted_median(posStar[:, 2], massStar)])
-        Vmean = np.array([MATH.weighted_median(velStar[:, 0], massStar), MATH.weighted_median(velStar[:, 1], massStar), MATH.weighted_median(velStar[:, 2], massStar)])
+        pt4 = file['PartType4']
+    
+        if 'GFM_StellarFormationTime' not in pt4.keys():
+            raise KeyError("PartType4 não contém GFM_StellarFormationTime")
+    
+        sft = pt4['GFM_StellarFormationTime'][:]
+        mask_star = sft > 0.0   # estrelas reais; wind particles têm <= 0
+    
+        if np.sum(mask_star) == 0:
+            raise ValueError("Não há estrelas reais em PartType4 após remover wind particles")
+    
+        pos = posStar = pt4['Coordinates'][:][mask_star] * factor
+        mass = massStar = pt4['Masses'][:][mask_star] * 1e10 / h
+        vel = velStar = pt4['Velocities'][:][mask_star] * scalefactorsqrt
+    
+        JStar = massStar[:, np.newaxis] * np.cross(posStar, velStar)
+    
+        Cen = np.array([
+            MATH.weighted_median(posStar[:, 0], massStar),
+            MATH.weighted_median(posStar[:, 1], massStar),
+            MATH.weighted_median(posStar[:, 2], massStar)
+        ])
+    
+        Vmean = np.array([
+            MATH.weighted_median(velStar[:, 0], massStar),
+            MATH.weighted_median(velStar[:, 1], massStar),
+            MATH.weighted_median(velStar[:, 2], massStar)
+        ])
+    
         CenFind = True
-
+    
     except Exception:
-        posStar = velStar =  np.array([0, 0, 0])
-        massStar = np.array([0]) 
-        JStar = massStar[:, np.newaxis]*(np.cross(posStar, velStar))
-
+        posStar = velStar = np.array([0, 0, 0])
+        massStar = np.array([0])
+        JStar = massStar[:, np.newaxis] * np.cross(posStar, velStar)
         CenFind = False
 
     try:
@@ -5323,6 +5343,21 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
         y = file['Header'].attrs['MassTable'][1]*np.ones(len(file['PartType1']['Coordinates'])) * 1e10 / h
     else:
         y =  file[PartType]['Masses'][:] * 1e10 / h
+        
+    if PartType == 'PartType4':
+        if 'GFM_StellarFormationTime' not in file['PartType4'].keys():
+            raise KeyError("PartType4 não contém GFM_StellarFormationTime")
+    
+        sft = file['PartType4']['GFM_StellarFormationTime'][:]
+        mask_star = sft > 0.0   # estrela real
+        pos = pos[mask_star]
+        vel = vel[mask_star]
+        mass = mass[mask_star]
+        y = y[mask_star]
+    
+        r = r[mask_star]
+        velrad = velrad[mask_star]
+        jang = jang[mask_star]
     
         
     # filtro para star-forming gas
@@ -5337,7 +5372,7 @@ def MakeDensityProfileMean(snap, ID, rmin, rmax, nbins, PartType = 'PartType4', 
 
         sfr = file['PartType0']['StarFormationRate'][:]
         mask_sf = sfr > 0.0
-
+        
         pos = pos[mask_sf]
         vel = vel[mask_sf]
         mass = mass[mask_sf]
@@ -5452,6 +5487,7 @@ def MakeScatterParams(df_Param, df_Sample, ParamName, Mean_At_Time = [1, 2, 5, 8
 
     return
     
+
 def PhasingData(ID, dfStudy):
     r_over_R_Crit200FinalGroup = extractDF('r_over_R_Crit200_FirstGroup')
     time = np.flip(dfTime['Age'].values)
@@ -5517,7 +5553,12 @@ def MedianPhases(AllValues, Allphases, func = np.nanmedian, nboots = 100):
             Values = AllValues[Allphases == phase]
             Values = Values[~np.isnan(Values)]
             #print(phase, len(Values))
-            if len(Values) < 5:
+            if len(Values) <= 5:
+                Finalphase = np.append(Finalphase, np.nan)
+                FinalValue = np.append(FinalValue, np.nan)
+                FinalError = np.append(FinalError, np.nan)
+                
+            elif len(Values[np.isinf(Values)]) > 5:
                 Finalphase = np.append(Finalphase, np.nan)
                 FinalValue = np.append(FinalValue, np.nan)
                 FinalError = np.append(FinalError, np.nan)
@@ -5542,10 +5583,60 @@ def MedianPhases(AllValues, Allphases, func = np.nanmedian, nboots = 100):
         return  Allphases,Allphases, Allphases
 
 
-def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' , N = 1000):
+
+def MedianPhasePopulation(Study, dfName=None, Name=None, return_matrix=False):
+    """
+    Calcula a phase mediana de uma população de galáxias.
+
+    Retorna:
+        median_phase : array com N_snapshots elementos
+        phase_matrix : opcional, matriz N_galaxies x N_snapshots
+        valid_ids    : IDs usados no cálculo
+    """
+
+    dfStudy = extractPopulation(Study, dfName=dfName, Name=Name)
+
+    ids = dfStudy["SubfindID_99"].dropna().astype(int).unique()
+
+    phase_list = []
+    valid_ids = []
+    failed_ids = []
+
+    for ID in ids:
+        try:
+            phases = PhasingData(ID, dfStudy)
+
+            if phases is None:
+                continue
+
+            phases = np.asarray(phases, dtype=float)
+
+            # opcional: garantir que tem o tamanho esperado
+            if len(phases) != 100:
+                print(f"ID {ID} ignorado: len(phases) = {len(phases)}")
+                continue
+
+            phase_list.append(phases)
+            valid_ids.append(ID)
+
+        except Exception as e:
+            failed_ids.append((ID, str(e)))
+            continue
+
+    phase_matrix = np.vstack(phase_list)
+
+    median_phase = np.nanmedian(phase_matrix, axis=0)
+
+    if return_matrix:
+        return median_phase, phase_matrix, valid_ids, failed_ids
+
+    return median_phase
+
+def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' , N = 500):
     
     dfParam = extractDF(param)
     dfStudy = extractPopulation(Study, dfName = dfName, Name = Name)
+    snapLostGas = int(np.nanmedian(dfStudy.SnapLostGas.values[dfStudy.SnapLostGas.values > 0]))
     
     #try:
     X_ = np.arange(-1, 5)
@@ -5554,7 +5645,6 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
     X_ = np.unique(X_)
     N = len(X_)
     for i, ID in enumerate(dfStudy['SubfindID_99'].values):
-        
         try:
             Values = np.flip(np.array([v for v in dfParam[str(ID)].values]))
         except Exception:
@@ -5578,10 +5668,16 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
 
             phases = PhasingData(ID, dfStudy)
 
-            phases = phases[(~np.isnan(Values)) ]
             if 'sSFR' in param:
-                Values[Values < -14] = -14
-            Values = Values[(~np.isnan(Values)) ]
+                 Values[Values < -14] = -14
+                
+            # elif 'Gas' in param or 'Type0' in param:
+            #     Values[snapLostGas:] = np.nan
+            Cond_nan = (~np.isnan(phases)) & (~np.isnan(Values))
+            phases = phases[Cond_nan]
+            Values = Values[Cond_nan]
+            phases_max = phases[np.isfinite(Values)][-1]
+            
             if len(Values) == 0:
                 Values = np.zeros(N)
                 Values[Values == 0] = np.nan
@@ -5604,7 +5700,7 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
                 else:
                     X_Y_Spline = interp1d(phases, np.log10(Values),kind="linear",fill_value="extrapolate")
                     Values = 10**X_Y_Spline(X_)
-                Values[X_ > phases.max()] = np.nan
+                Values[X_ > phases_max] = np.nan
                 phases = X_
 
                 if i == 0:
@@ -5624,6 +5720,7 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
     #    FinalError = Finalphase
 
     #    return Finalphase, FinalValue, FinalError
+
 
 
 def ParticleParameters(f, ID, snap):

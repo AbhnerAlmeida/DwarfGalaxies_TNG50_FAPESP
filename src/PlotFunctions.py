@@ -254,9 +254,9 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
                                            lw=mult * 0.5* linesthicker(name), dash_capstyle = capstyles(name)))
                   
             else:
-            
+                
                 custom_lines.append(Line2D([0], [0], color=colors(name), ls=lines(name), 
-                                           lw=mult * 0.5* linesthicker(name), dash_capstyle = capstyles(name)))
+                                           lw=mult * 0.5 * linesthicker(name), dash_capstyle = capstyles(name)))
             label.append(titles(name))
 
     if len(names) < 4:
@@ -313,7 +313,7 @@ def PlotMedianEvolution(
     names,  columns,  rows,  Type="Evolution", Xparam=("Time",),
 
     # --- Modos / lógica do gráfico ---
-    ColumnPlot=True,  lineparams=False, PhasingPlot=False,   LookBackTime=True,
+    ColumnPlot=True,  lineparams=False, PhasingPlot=False,  PhasingMedianLine = False, LookBackTime=True,
 
     # --- Comparações / normalizações ---
     CompareToNormal=False, CompareToNormalLog=True, CompareToNormal_Name=False,  NormalizedExSitu=False, NormalRatio=False,
@@ -721,15 +721,18 @@ def PlotMedianEvolution(
                                 snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
                                 if not np.isnan(snap_first):
                                    x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
-                                   
-                                   ax.plot(
-                                        [x_entry, x_entry], [0.98, 1.03],
-                                        transform=ax.get_xaxis_transform(),
-                                        color=colors(names[l]),
-                                        lw=2.6,
-                                        alpha=1.,
-                                        clip_on=False
-                                    )
+                                   ax.axvline( x_entry,
+                                               color=colors(names[l]),
+                                               lw=0.7, ls = 'dashed',
+                                               alpha=1., zorder = 0)
+                                   # ax.plot(
+                                   #      [x_entry, x_entry], [0.98, 1.03],
+                                   #      transform=ax.get_xaxis_transform(),
+                                   #      color=colors(names[l]),
+                                   #      lw=2.6,
+                                   #      alpha=1.,
+                                   #      clip_on=False
+                                   #  )
                         # pericenter marker
                         if Pericenter and len(argInfall1) > 0:
                             idx = argInfall1[-1]
@@ -863,7 +866,35 @@ def PlotMedianEvolution(
                             timeParam = np.asarray(datatime[l])
                             phaseParam = np.asarray(dataphasetime[l])
                         else:
-                            xParam = time
+                            if PhasingMedianLine:
+                                xParam = TNG.MedianPhasePopulation(
+                                            names[l]+column,
+                                            dfName=dfName,
+                                            Name=Name
+                                        )
+                                xParam = np.asarray(xParam, dtype=float)
+
+                                # Inverta xParam
+                                xParam = np.flip(xParam)
+
+                                # IMPORTANTE: se values está na mesma ordem de snapshot que xParam original,
+
+                                eps = 1e-8
+
+                                COND_Phase = np.zeros_like(xParam, dtype=bool)
+
+                                last_kept = np.inf
+
+                                for icond, x in enumerate(xParam):
+                                    if not np.isfinite(x):
+                                        continue
+
+                                    if x < last_kept - eps:
+                                        COND_Phase[icond] = True
+                                        last_kept = x
+                            else:
+                                xParam = time
+                                
                             timeParam = time
                             phaseParam = time
 
@@ -872,13 +903,13 @@ def PlotMedianEvolution(
 
                             # thresholds
                             if "sSFR" in str(paramname):
-                                values[values < -13.5] = np.nan
+                                values[values <= -14] = np.nan
                             elif "SFR" in str(paramname):
-                                values[values < -4] = np.nan
-                                
+                                values[values <= -4] = np.nan
                             # Legacy: if phasing plot + “LoseTheir” gas case: cut after first NaN
                             if PhasingPlot:
-                                if ("GasMass" in row[0] and "GasMass" in row[1]) and ("LoseTheir" in column):
+
+                                if ("GasMass" in row[0] and "GasMass" in row[1]):#and ("LoseTheir" in column):
                                     arg_inf = np.argwhere(np.isinf(values)).T[0]
                                     arg_inf = arg_inf[arg_inf > 5]
                                     if len(arg_inf) > 0:
@@ -901,7 +932,16 @@ def PlotMedianEvolution(
                                         values[xParam > PhaseNonGas] = np.nan
 
                             m = _finite_mask(values) & _finite_mask(xParam)
+                            if PhasingMedianLine:
 
+                                m = m & COND_Phase
+
+                                m = m & np.isfinite(values)
+                                print(xParam[m], values[m])
+
+                                m = m & (xParam < 2) #CHECK
+                                
+                                
                             ax.plot(
                                 xParam[m], values[m],
                                 color=colors(names[l]),
@@ -923,15 +963,18 @@ def PlotMedianEvolution(
                                 snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
                                 if not np.isnan(snap_first):
                                    x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
-                                   
-                                   ax.plot(
-                                        [x_entry, x_entry], [0.98, 1.03],
-                                        transform=ax.get_xaxis_transform(),
-                                        color=colors(names[l]),
-                                        lw=2.6,
-                                        alpha=1.,
-                                        clip_on=False
-                                    )
+                                   ax.axvline( x_entry,
+                                               color=colors(names[l]),
+                                               lw=0.7, ls = 'dashed',
+                                               alpha=1., zorder = 0)
+                                   # ax.plot(
+                                   #      [x_entry, x_entry], [0.98, 1.03],
+                                   #      transform=ax.get_xaxis_transform(),
+                                   #      color=colors(names[l]),
+                                   #      lw=2.6,
+                                   #      alpha=1.,
+                                   #      clip_on=False
+                                   #  )
 
                         else:
                             x = _safe_array(dataX[l])
@@ -1000,6 +1043,10 @@ def PlotMedianEvolution(
             if p_for_scale == "GroupNsubsFinalGroup":
                 ax.set_yticks([20, 30, 40, 60])
                 ax.set_yticklabels(["20", "30", "40", "60"])
+                
+            if p_for_scale == "Frac_ExSitu":
+                ax.set_yticks([0.01, 0.05, 0.1])
+                ax.set_yticklabels(["0.01", "0.05", "0.1"])
 
             if p_for_scale == "StarMassNormalized":
                 ax.set_yticks([0.1, 0.2, 0.5, 1])
@@ -1053,7 +1100,7 @@ def PlotMedianEvolution(
                 if title:
                     ax.set_title(titles(title[j]), fontsize=1.1 * fontlabel)
 
-                if Type == "Evolution" and (not PhasingPlot):
+                if Type == "Evolution" and (not PhasingPlot and not PhasingMedianLine):
                     ax2 = ax.twiny()
                     ax2.grid(False)
 
@@ -1082,7 +1129,7 @@ def PlotMedianEvolution(
             # Bottom row x-axis formatting
             if i == len(rows) - 1:
                 if Type == "Evolution":
-                    if LookBackTime and (not PhasingPlot):
+                    if LookBackTime and (not PhasingPlot and not PhasingMedianLine):
                         if JustOneXlabel:
                             if (j == 1):
                                 ax.set_xlabel(r"$\mathrm{Lookback \; Time} \, \, [\mathrm{Gyr}]$", fontsize=fontlabel)
@@ -1101,7 +1148,7 @@ def PlotMedianEvolution(
                                 ax.set_xticklabels(["14", "12", "10", "8", "6", "4", "2", "0"])
                             else:
                                 ax.set_xticklabels(["14", "12", "10", "8", "6", "4", "2", "0"] if j == 0 else ["", "12", "10", "8", "6", "4", "2", "0"])
-                    elif not PhasingPlot:
+                    elif not PhasingPlot and not PhasingMedianLine:
                         ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
                         if JustOneXlabel:
                             if i == 1:
@@ -1119,7 +1166,7 @@ def PlotMedianEvolution(
                         ax.set_xlabel(r"$\phi_\mathrm{orbital}$", fontsize=fontlabel)
                         ax.set_xticks(postiveXticks)
                         ax.set_xticklabels(postiveXLabels)
-                        ax.set_xlim(-1, xPhaseLim + 0.5)
+                        ax.set_xlim(-1, xPhaseLim)
 
                     ax.tick_params(axis="x", labelsize=multtick * fontlabel)
 
@@ -1324,7 +1371,7 @@ def PlotHist(
             return
         
         if param == 'deltaSize_at_Entry':
-            bins_edges = np.linspace(-1.5, 3.5, 10)
+            bins_edges = np.linspace(-1.5, 3.5, 11)
             ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
                     color=colors(name_key), ls=lines(name_key),
                     density=density, linewidth=linewidth)
@@ -1338,7 +1385,7 @@ def PlotHist(
             return
         
         if param == 'sSFRinHalfRadAfterz5':
-            bins_edges = np.linspace(-11.8, -9.2, 10)
+            bins_edges = np.linspace(-11.8, -9.2, 9)
             ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
                     color=colors(name_key), ls=lines(name_key),
                     density=density, linewidth=linewidth)
@@ -1390,7 +1437,7 @@ def PlotHist(
             center = np.nanmedian(v_raw)
             ymax = 0.5
             ax.axvline(center, ymax=ymax, color=colors(name_key),
-                       ls=lines(name_key), linewidth=1.5 * linewidth, zorder = 5) 
+                       ls='solid', linewidth=1.8 * linewidth, zorder = 5) 
             if medianPlot:
                 try:
                     xerr = MATH.boostrap_func(v_raw, num_boots=nboots)
@@ -1824,7 +1871,7 @@ def PlotScatter(
             ax.axvline(0,color = 'black',linestyle='dashed',lw=linewidth, zorder = 1)
             axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth, zorder = 1)
             #axs[i][j].fill_between(xfitline, -7, xfitline, alpha=0.2, color='tab:red')  # orange
-            axs[i][j].text(-1.0, -1.4, "TS", fontsize = 0.99*fontlabel)
+            axs[i][j].text(-1.0, -1.4, "oSP", fontsize = 0.99*fontlabel)
             #axs[i][j].fill_between(xfitline, xfitline, 1, alpha=0.2, color='tab:blue')  # orange
             axs[i][j].text(-1.4,-1., "iSP", fontsize = 0.99*fontlabel)
             
@@ -3198,7 +3245,7 @@ def PlotIDsAllTogether(
 
                                     # sSFR clipping as in your original
                                     if "sSFR" in str(row):
-                                        values[values < -13.5] = np.nan
+                                        values[values < -14] = np.nan
 
                                     xt = xparamMedian.copy()
                                     cond = (~np.isnan(values)) & (~np.isinf(values)) & (~np.isnan(xt))
@@ -3224,7 +3271,7 @@ def PlotIDsAllTogether(
 
                         if "sSFR" in str(row):
                             Yerr_plot[Y_plot < -3.5] = np.nan
-                            Y_plot[Y_plot < -13.5] = np.nan
+                            Y_plot[Y_plot < -14] = np.nan
 
                         axs[i][j].plot(
                             xparamMedian[~np.isnan(Y_plot)],
