@@ -276,8 +276,8 @@ BASE_colors = {
         'NormalGamaColor': 'navajowhite', 
         'GAMAColor': 'crimson', 
         
-        'SatelliteDMrich':  '#9467BD',
-        'SatelliteDMpoor':  '#8C564B',
+        'SatelliteDMrich':  'blueviolet',
+        'SatelliteDMpoor':  'peru',
         'SatelliteNotInteract':  'blue',
         'SatelliteInteract':  'red',
         'Central':  'black',
@@ -295,8 +295,8 @@ BASE_colors = {
         'DiffuseCentralError': 'tab:red',
         'SubDiffuseCentralError': 'tab:purple',
 
-        'SatelliteDMrichError':  'tab:purple',
-        'SatelliteDMpoorError':  'tab:brown',
+        'SatelliteDMrichError':  '#C7A4F4',
+        'SatelliteDMpoorError':  '#E6C19A',
         'SatelliteNotInteractError':  'tab:blue',
         'SatelliteInteractError':   'tab:red',
         'CentralError':  'gray',
@@ -583,9 +583,9 @@ BASE_titles = {
     'TNGrageCentral':  'Central galaxies',
 
     'Selected':  'Selected',
-    'SatelliteSelected': 'Satellite',
-    'Satellite':  'Satellite',
-    'Central':  'Central',
+    'SatelliteSelected': 'Satellites',
+    'Satellite':  'Satellites',
+    'Central':  'Centrals',
     'BadFlag':  'Bad flags',
     
     'AllSB_TEST': 'All',
@@ -627,7 +627,7 @@ BASE_titles = {
     'DontLoseTheirGas': 'Retain their gas',
     'LoseTheirGas': 'Lose their gas',
     
-    'CentralColorbar': 'Central',
+    'CentralColorbar': 'Centrals',
     
     
     #EVOLUTION

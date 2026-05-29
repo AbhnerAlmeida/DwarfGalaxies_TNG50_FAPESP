@@ -397,7 +397,7 @@ for j, PartType in enumerate(['PartType0', 'PartType0', 'PartType4']):
             axs[j][linplot].plot(xFinal , yFinal, color = 'blue', lw = 1.5, label = r'$t_\mathrm{entry} + 2 \, \mathrm{[Gyr]}$')
         
         if j == 0:
-            axs[j][linplot].set_title(Names[linplot], fontsize=1.1*fontlabel)
+            axs[j][linplot].set_title(Names[linplot], fontsize=1.1*fontlabel, y = 1.01)
         
         if j != 0 :
             axs[j][linplot].set_yscale('log')

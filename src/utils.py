@@ -201,37 +201,33 @@ def _scatter_with_colorbar(
 
     if colorbar_key == "z_At_FirstEntry":
         # # 3 discrete redshift bins
-        # z_bins = [0.0, 0.4, 0.8, 5]
+        z_bins = [0.0, 0.5, 1.0, 1.5]
     
         # # pick 3 clearly separated colors from the chosen cmap
-        # cmap_discrete = mpl.colors.ListedColormap([
-        #     cmap(0.05),  # late entry
-        #     cmap(0.50),  # intermediate
-        #     cmap(0.95),  # early entry
-        # ])
+        cmap_discrete = mpl.colors.ListedColormap([
+            cmap(0.05),  # late entry
+            cmap(0.50),  # intermediate
+            cmap(0.95),  # early entry
+        ])
         
     
-        # norm_for_colorbar = mpl.colors.BoundaryNorm(
-        #     boundaries=z_bins,
-        #     ncolors=cmap_discrete.N,
-        #     clip=True
-        # )
+        norm_for_colorbar = mpl.colors.BoundaryNorm(
+            boundaries=z_bins,
+            ncolors=cmap_discrete.N,
+            clip=True
+        )
     
-        # sc = ax.scatter(
-        #     x, y,
-        #     c=color_values,
-        #     edgecolor='k',  # simpler and clearer than varying edge colors
-        #     alpha=alpha_scatter,
-        #     lw=0.9,
-        #     marker=marker,
-        #     s=size,
-        #     cmap=cmap_discrete,
-        #     norm=norm_for_colorbar
-        # )
-        
-        sc = ax.scatter(x, y, c=color_values, edgecolor='k',
-                        alpha=alpha_scatter, lw=0.6, marker=marker, s=size,
-                        cmap=cmap, vmin=0, vmax=1.5)
+        sc = ax.scatter(
+            x, y,
+            c=color_values,
+            edgecolor='k',  # simpler and clearer than varying edge colors
+            alpha=alpha_scatter,
+            lw=0.9,
+            marker=marker,
+            s=size,
+            cmap=cmap_discrete,
+            norm=norm_for_colorbar
+        )
         return sc, norm_for_colorbar
     
 

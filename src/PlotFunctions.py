@@ -45,6 +45,9 @@ from matplotlib.ticker import FixedLocator
 from matplotlib.ticker import FixedFormatter
 from matplotlib.offsetbox import AnchoredText
 
+from matplotlib.patches import Circle
+from matplotlib.legend_handler import HandlerPatch
+
 from scipy.signal import argrelextrema
 from scipy.interpolate import interp1d
 from scipy import stats
@@ -89,6 +92,28 @@ Nsim = '-1'
 dfTime = pd.read_csv(os.getenv("HOME")+'/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/utils/SNAPS_TIME.csv')
 
 
+
+class HandlerCircle(HandlerPatch):
+    def create_artists(
+        self, legend, orig_handle,
+        xdescent, ydescent, width, height, fontsize, trans
+    ):
+        radius = min(width, height) / 2.
+        center = (xdescent + width / 2, ydescent + height / 2)
+
+        circle = Circle(
+            center,
+            radius=radius,
+            facecolor=orig_handle.get_facecolor(),
+            edgecolor=orig_handle.get_edgecolor(),
+            linewidth=orig_handle.get_linewidth(),
+            linestyle=orig_handle.get_linestyle()
+        )
+
+        circle.set_transform(trans)
+        return [circle]
+    
+    
 def format_func_loglog(value, tick_number):
     '''
     change label in log plots
@@ -135,6 +160,9 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
     
     custom_lines = []
     label = []
+    
+
+
     for name in names: 
         
         if 'Scatter' in name or name == 'Bian et al. (2025)':
@@ -199,8 +227,16 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
                                markersize = msizeMult*msize(name), markeredgecolor = 'k'))
                     if 'LoseTheirGas' in name:
                         custom_lines.append(
-                        Line2D([0], [0], color='k', linestyle = lines(name), lw=1.1, marker=markers(name),  markeredgewidth = lwe,
-                               markersize = 0*msize(name), markeredgecolor = 'k', markerfacecolor='white'))
+                            Circle(
+                                (0, 0),
+                                radius=2,
+                                facecolor='white',
+                                edgecolor='k',
+                                linewidth=lwe,
+                                linestyle=lines(name)   # '-' ou '--'
+                            )
+                        )
+                        
                     else:
                         custom_lines.append(
                         Line2D([0], [0], color=colors(name), lw=lw, marker=markers(name),  markeredgewidth = lwe,
@@ -723,8 +759,8 @@ def PlotMedianEvolution(
                                    x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
                                    ax.axvline( x_entry,
                                                color=colors(names[l]),
-                                               lw=0.7, ls = 'dashed',
-                                               alpha=1., zorder = 0)
+                                               lw=0.8, ls = 'dashed',
+                                               alpha=0.8, zorder = 0)
                                    # ax.plot(
                                    #      [x_entry, x_entry], [0.98, 1.03],
                                    #      transform=ax.get_xaxis_transform(),
@@ -965,8 +1001,8 @@ def PlotMedianEvolution(
                                    x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
                                    ax.axvline( x_entry,
                                                color=colors(names[l]),
-                                               lw=0.7, ls = 'dashed',
-                                               alpha=1., zorder = 0)
+                                               lw=0.8, ls = 'dashed',
+                                               alpha=0.8, zorder = 0)
                                    # ax.plot(
                                    #      [x_entry, x_entry], [0.98, 1.03],
                                    #      transform=ax.get_xaxis_transform(),
@@ -1587,7 +1623,7 @@ def PlotHist(
                     zval = dfTime.z.loc[dfTime.Snap == int(titlename)].values[0]
                     ax.set_title(r'$z = %.1f$' % zval, fontsize=1.1 * fontlabel)
                 if title:
-                    ax.set_title(titles(title[j]), fontsize=1.1 * fontlabel)
+                    ax.set_title(titles(title[j]), fontsize=1.1 * fontlabel, y = 1.01)
 
                 lab = labels.get(param, 'None')
                 time_like = ('Gyr' in lab) and ('Gyr^' not in lab) and ('_after_' not in str(param)) and ('Delta' not in lab)
@@ -1615,6 +1651,9 @@ def PlotHist(
                     if xlimmin[j] == -0.05 and xlimmax[j] == 1.05:
                         ax.set_xticks([0, 0.5, 1])
                         ax.set_xticklabels(['0', '0.5', '1'])
+                if 'sSFRinHalfRadAfterz5' in param:
+                    ax.set_yticks([1, 10, 100])
+                    ax.set_yticklabels(['1', '10', '100'])
                         
                 # if 'logStarZ_99' in param or 'logZ_99' in param:
                 #     ax.set_yticks([10, 20, 30, 40, 50, 60, 70])
@@ -1871,9 +1910,9 @@ def PlotScatter(
             ax.axvline(0,color = 'black',linestyle='dashed',lw=linewidth, zorder = 1)
             axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth, zorder = 1)
             #axs[i][j].fill_between(xfitline, -7, xfitline, alpha=0.2, color='tab:red')  # orange
-            axs[i][j].text(-1.0, -1.4, "oSP", fontsize = 0.99*fontlabel)
+            axs[i][j].text(-1.15, -1.58, "Outer stellar profile \n evolution \n dominates", fontsize = 0.99*fontlabel)
             #axs[i][j].fill_between(xfitline, xfitline, 1, alpha=0.2, color='tab:blue')  # orange
-            axs[i][j].text(-1.4,-1., "iSP", fontsize = 0.99*fontlabel)
+            axs[i][j].text(-1.8,-0.75, "Inner stellar profile \n evolution \n dominates", fontsize = 0.99*fontlabel)
             
         elif (ParamX == 'sSFRTrueInner_BeforeEntry' and  (ParamsY[0] == 'sSFRTrueInner_Entry_to_Nogas')) :
 
@@ -2065,10 +2104,10 @@ def PlotScatter(
 
                 cb.ax.set_yticklabels(['-0.7', '-0.6', '-0.5', '-0.4', '-0.3', '-0.2', '-0.1', '0'])
                 
-            # elif COLORBAR[0]  in ["z_At_FirstEntry"]:
-            #     cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0.4, 0.8, 1.0, 1.2, 1.], pad=0.02, aspect=(ratioColorbar or 50))
+            elif COLORBAR[0]  in ["z_At_FirstEntry"]:
+                cb = fig.colorbar(sc,  ax=axs.ravel().tolist(), ticks=[0.0, 0.5, 1.0, 1.5], pad=0.02, aspect=(ratioColorbar or 50))
 
-            #     cb.ax.set_yticklabels(['0.4', '0.8'])
+                cb.ax.set_yticklabels(['0', '0.5', '1.0', '1.5'])
                 
             else:
                 cb = fig.colorbar(mappable, ax=axs.ravel().tolist(), pad=0.02, aspect=(ratioColorbar or 50))
@@ -2255,7 +2294,6 @@ def PlotScatter(
                     
             # X label on last row
             if i == len(ParamsY) - 1:
-                
                 if len(ParamsX) > 1 and label_general:
                     ax.set_xlabel(labelsequal.get(ParamsX[j], ParamsX[j]), fontsize=1.2 * fontlabel)
                     if  ParamsX[j] == 'z_Birth':
@@ -2271,7 +2309,6 @@ def PlotScatter(
                 
                 else:
                    
-
                     ax.set_xlabel(labels.get(ParamsX[0], ParamsX[0]), fontsize=1.2 * fontlabel)
                     if xscale != None:
                         ax.set_xscale(xscale)
@@ -2280,6 +2317,11 @@ def PlotScatter(
                         
                    
                     if len(ParamsX) > 1 and ParamsX[j] == 'z_Birth':
+                        ax.set_xscale('symlog',linthresh=0.02)
+                        ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
+                        ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
+                        
+                    if  ParamsX[j] == 'z_Birth':
                         ax.set_xscale('symlog',linthresh=0.02)
                         ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
                         ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
@@ -2318,6 +2360,7 @@ def PlotScatter(
                             handlelength=handlelength,
                             handletextpad=handletextpad,
                             labelspacing=labelspacing,
+                            handler_map={Circle: HandlerCircle()},
                         )
 
     # Global colorbar (preserve your original block here)
@@ -4297,8 +4340,8 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                         ls =  (0, (10, 6))
 
                     else:
-                        color = colors.get(row[l], 'black')
-                        ls = lines.get(row[l], 'solid')
+                        color = colors(row[l])
+                        ls = lines(row[l], 'solid')
         
                     if CompareToNormal:
                         values[~np.isnan(values)] = (values[~np.isnan(values)] - Y[~np.isnan(values)]) / Yerr[~np.isnan(values)]
@@ -4345,13 +4388,13 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                      
                         
                         axs[i][j].plot(xparam[~np.isnan(Y)], Y[~np.isnan(
-                            Y)], color=colors.get(ShowPopName, 'black'), ls=ls, 
-                            lw=1.*linesthicker.get(ShowPopName, linewidth), dash_capstyle = capstyles.get(ShowPopName, 'projecting'))
+                            Y)], color=colors(ShowPopName), ls=ls, 
+                            lw=1.*linesthicker(ShowPopName), dash_capstyle = capstyles(ShowPopName))
             
 
                         axs[i][j].fill_between(
                             xparam[~np.isnan(Y)], Y[~np.isnan(Y)] - Yerr[~np.isnan(Y)], 
-                            Y[~np.isnan(Y)] + Yerr[~np.isnan(Y)], color=colors.get(ShowPopName+'Error', 'black'), ls=ls, alpha=alphaShade)
+                            Y[~np.isnan(Y)] + Yerr[~np.isnan(Y)], color=colors(ShowPopName+'Error'), ls=ls, alpha=alphaShade)
                          
                     axs[i][j].plot(xparam[~np.isnan(values)], values[~np.isnan(values)], color=color,  ls=ls, lw=linewidth)
 
@@ -4524,14 +4567,14 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                             markervalues = np.flip(markervalues)
                             MarkerTotvalues = np.flip(MarkerTotvalues)
 
-                        axs[i][j].scatter(xparam[(Markervalues > 0)], values[(Markervalues > 0)], color=colors.get(
-                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=250, alpha=0.7)
-                        axs[i][j].scatter(xparam[(markervalues > 0)], values[(markervalues > 0)], color=colors.get(
-                            str(l), 'black'), lw=1., marker='s',  edgecolors='black', s=100, alpha=0.7)
+                        axs[i][j].scatter(xparam[(Markervalues > 0)], values[(Markervalues > 0)], color=colors(
+                            str(l)), lw=1., marker='o',  edgecolors='black', s=250, alpha=0.7)
+                        axs[i][j].scatter(xparam[(markervalues > 0)], values[(markervalues > 0)], color=colors(
+                            str(l)), lw=1., marker='s',  edgecolors='black', s=100, alpha=0.7)
                         
                         if ~np.isnan(SnapCorotateMerger):
                             axs[i][j].scatter(time[(MarkerTotvalues > 0)], values[(MarkerTotvalues > 0)], 
-                                              color=colors.get(str(l), 'black'), lw=1., marker='*',  edgecolors='black', s=300, alpha=0.7)
+                                              color=colors(str(l)), lw=1., marker='*',  edgecolors='black', s=300, alpha=0.7)
 
                 elif Type == 'CoEvolution':
                     x = dfX[str(ID)].values
@@ -4669,10 +4712,10 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                             markervalues = np.flip(markervalues)
                             MarkerTotvalues = np.flip(MarkerTotvalues)
 
-                        axs[i][j].scatter(x[(Markervalues > 0)], values[(Markervalues > 0)], color=colors.get(
-                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=130, alpha=0.5)
-                        axs[i][j].scatter(x[(markervalues > 0)], values[(markervalues > 0)], color=colors.get(
-                            str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=110, alpha=0.5)
+                        axs[i][j].scatter(x[(Markervalues > 0)], values[(Markervalues > 0)], color=colors(
+                            str(l)), lw=1., marker='o',  edgecolors='black', s=130, alpha=0.5)
+                        axs[i][j].scatter(x[(markervalues > 0)], values[(markervalues > 0)], color=colors(
+                            str(l)), lw=1., marker='o',  edgecolors='black', s=110, alpha=0.5)
                         #axs[i][j].scatter(x[(MarkerTotvalues > 0)], values[(MarkerTotvalues > 0)], color=colors.get(
                             #str(l), 'black'), lw=1., marker='o',  edgecolors='black', s=15, alpha=0.5)
 
@@ -4693,9 +4736,9 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
             
             if ylimmin != None and ylimmax != None:
                 axs[i][j].set_ylim(ylimmin[i], ylimmax[i])
-            if scales.get(row[0]) != None :
-                axs[i][j].set_yscale(scales.get(row[0]))
-            if scales.get(row[0]) == 'log' :
+            if scales(row[0]) != None :
+                axs[i][j].set_yscale(scales(row[0]))
+            if scales(row[0]) == 'log' :
                 axs[i][j].yaxis.set_major_formatter(
                     FuncFormatter(format_func_loglog))
                 
@@ -4708,10 +4751,10 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
 
                 if len(row) > 1:
                     axs[i][j].set_ylabel(
-                        labelsequal.get(row[0]), fontsize=fontlabel)
+                        labelsequal.get(row[0], row[0]), fontsize=fontlabel)
 
                 else:
-                    axs[i][j].set_ylabel(labels.get(row[0]), fontsize=fontlabel)
+                    axs[i][j].set_ylabel(labels.get(row[0], row[0]), fontsize=fontlabel)
 
             if j == len(IDs) - 1:
                 if xlabelintext and not limaxis and len(rows) > 1:
@@ -4719,7 +4762,7 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                              'size': fontlabel,
                              }
                     anchored_text = AnchoredText(
-                        texts.get(row), loc='upper right', prop=Afont)
+                        texts(row), loc='upper right', prop=Afont)
                     axs[i][j].add_artist(anchored_text)
 
             if xlabelintext and limaxis and len(rows) > 1:
@@ -4738,16 +4781,16 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                              'size': fontlabel,
                              }
                     anchored_text = AnchoredText(
-                        titles.get(
-                            title[i], title[i]), loc=postext[i], prop=Afont)
+                        titles(
+                            title[i]), loc=postext[i], prop=Afont)
                     axs[i][j].add_artist(anchored_text)
 
 
             if i == 0:
 
                 if title and not ColumnPlot:
-                    axs[i][j].set_title(titles.get(
-                        title[j], title[j]), fontsize=1*fontlabel)
+                    axs[i][j].set_title(titles(
+                        title[j]), fontsize=1*fontlabel)
                 
 
                 if Type == 'Evolution' and not PhasingPlot:
@@ -4835,12 +4878,12 @@ def PlotIDsColumns(IDs, rows, dataMarker=None, dataLine=None, SatelliteTime = Fa
                         axs[i][j].set_xlim(-1, 5.5)
                         
                 elif Type == 'CoEvolution':
-                    axs[i][j].set_xscale(scales.get(Xparam[i], 'linear'))
-                    if scales.get(Xparam[i]) == 'log':
+                    axs[i][j].set_xscale(scales(Xparam[i]))
+                    if scales(Xparam[i]) == 'log':
                         axs[i][j].xaxis.set_major_formatter(
                             FuncFormatter(format_func_loglog))
-                    axs[i][j].set_xlabel(labels.get(
-                        Xparam[i], 'None'), fontsize=fontlabel)
+                    axs[i][j].set_xlabel(labels(
+                        Xparam[i]), fontsize=fontlabel)
 
     savefig(savepath, savefigname, TRANSPARENT)
 

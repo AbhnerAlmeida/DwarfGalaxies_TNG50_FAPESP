@@ -2789,7 +2789,7 @@ def extractPopulation(sample, PATH=os.getenv("HOME")+'/TNG_Analyzes/SubhaloHisto
                 
         for name in ['PreProcessingGalaxy', 'NotProcessing']:
             if name in sample:
-                print('PreProcessingGalaxy', name)
+                #print('PreProcessingGalaxy', name)
 
                 df = df.loc[(df.PreProcessingGalaxy == name)]
 
@@ -5668,8 +5668,8 @@ def makeMedianPhases(Study, param,  dfName = 'df_z0_Mstar_Range', Name = 'Name' 
 
             phases = PhasingData(ID, dfStudy)
 
-            if 'sSFR' in param:
-                 Values[Values < -14] = -14
+            # if 'sSFR' in param:
+            #      Values[Values < -14] = -14
                 
             # elif 'Gas' in param or 'Type0' in param:
             #     Values[snapLostGas:] = np.nan

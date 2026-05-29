@@ -14,23 +14,23 @@ plt.style.use(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/src/a
 import pandas as pd
 from scipy.stats import wasserstein_distance
 
-SGINALS = {'zentry': {'col': 'z_At_FirstEntry',
+SIGNALS = {'zentry': {'col': 'z_At_FirstEntry',
   'label': '$\\Delta z_{\\rm entry}$',
   'summary': 'median',
   'expected_sign': 1,
   'priority': 1},
  'm200': {'col': 'M200Mean',
-  'label': '$\\Delta \\log M_{200}$',
+  'label': '$\\Delta \overline{(\log M_{200})}$',
   'summary': 'median',
   'expected_sign': 1,
   'priority': 1},
  'rmean': {'col': 'rOverR200Mean_New',
-  'label': '$\\Delta \\langle R/R_{200}\\rangle$',
+  'label': '$\\Delta \overline{(R/R_{200})}$',
   'summary': 'median',
   'expected_sign': -1,
   'priority': 1},
  'rmin': {'col': 'rOverR200Min',
-  'label': '$\\Delta (R/R_{200})_{\\min}$',
+  'label': '$\\Delta (R/R_{200})^{\\min}_{\mathrm{pericentre}}$',
   'summary': 'median',
   'expected_sign': -1,
   'priority': 1},
@@ -73,6 +73,125 @@ quantile=0.28
 handlelength = 1.5
 
 lwsize = 0.8
+
+#%%
+
+def extract_numeric_population(population, keys, dfName='PaperII', Name='Name'):
+    df = TNG.extractPopulation(population, dfName=dfName, Name=Name).copy()
+
+    keep = [k for k in keys if k in df.columns]
+    out = df[keep].copy()
+
+    for k in keep:
+        out[k] = pd.to_numeric(out[k], errors='coerce')
+
+    return out
+
+#%%
+
+def transform_signal_values(x, transform=None):
+    x = np.asarray(x, dtype=float)
+
+    if transform is None:
+        return x
+
+    if transform == 'log10':
+        out = np.full_like(x, np.nan, dtype=float)
+        m = np.isfinite(x) & (x > 0)
+        out[m] = np.log10(x[m])
+        return out
+
+    raise ValueError(f"Unknown transform: {transform}")
+
+
+def build_results_dense_signal_scan(
+    sample_classes=('CompactsMB', 'CompactsSB'),
+    thresholds=np.linspace(0.45, 0.85, 41),
+    signal_order=('zentry', 'm200', 'rmean', 'rmin'),
+    dfName='PaperII',
+    Name='Name',
+    statistic='median',
+):
+    rows = []
+
+    needed_keys = [FDM_KEY] + [SIGNALS[s]['col'] for s in signal_order]
+
+    for sc in sample_classes:
+        sat_pop = POP_CONFIG[sc]['satellite_parent']
+
+        sat_df = extract_numeric_population(
+            sat_pop,
+            needed_keys,
+            dfName=dfName,
+            Name=Name
+        )
+
+        fdm = sat_df[FDM_KEY].to_numpy(dtype=float)
+        finite_fdm = np.isfinite(fdm)
+
+        for t in thresholds:
+            poor_mask = finite_fdm & (fdm < t)
+            rich_mask = finite_fdm & (fdm >= t)
+
+            Npoor_total = int(np.sum(poor_mask))
+            Nrich_total = int(np.sum(rich_mask))
+
+            for s in signal_order:
+                key = SIGNALS[s]['col']
+                transform = SIGNALS[s].get('transform', None)
+
+                vals = sat_df[key].to_numpy(dtype=float)
+                vals = transform_signal_values(vals, transform=transform)
+
+                poor_vals = vals[poor_mask]
+                rich_vals = vals[rich_mask]
+
+                poor_vals = poor_vals[np.isfinite(poor_vals)]
+                rich_vals = rich_vals[np.isfinite(rich_vals)]
+
+                if len(poor_vals) == 0 or len(rich_vals) == 0:
+                    poor_stat = np.nan
+                    rich_stat = np.nan
+                    delta = np.nan
+                else:
+                    if statistic == 'median':
+                        poor_stat = np.nanmedian(poor_vals)
+                        rich_stat = np.nanmedian(rich_vals)
+                    elif statistic == 'mean':
+                        poor_stat = np.nanmean(poor_vals)
+                        rich_stat = np.nanmean(rich_vals)
+                    else:
+                        raise ValueError("statistic must be either 'median' or 'mean'")
+
+                    delta = poor_stat - rich_stat
+
+                rows.append({
+                    'sample_class': sc,
+                    'threshold': t,
+                    'signal': s,
+                    'delta_poor_minus_rich': delta,
+                    'Npoor_total': Npoor_total,
+                    'Nrich_total': Nrich_total,
+                    'poor_stat': poor_stat,
+                    'rich_stat': rich_stat,
+                    'poor_median': np.nanmedian(poor_vals) if len(poor_vals) else np.nan,
+                    'rich_median': np.nanmedian(rich_vals) if len(rich_vals) else np.nan,
+                    'poor_mean': np.nanmean(poor_vals) if len(poor_vals) else np.nan,
+                    'rich_mean': np.nanmean(rich_vals) if len(rich_vals) else np.nan,
+                })
+
+    return pd.DataFrame(rows)
+
+#%%
+thresholds = np.linspace(0.45, 0.85, 41)
+results_dense = build_results_dense_signal_scan(
+    sample_classes=('CompactsMB', 'CompactsSB'),
+    thresholds=thresholds,
+    signal_order=('zentry', 'm200', 'rmean', 'rmin'),
+    statistic='median',
+    dfName='PaperII',
+    Name='Name',
+)
 
 #%%
 def plot_signal_scan(df_results, score_df=None,
@@ -147,6 +266,9 @@ def plot_signal_scan(df_results, score_df=None,
 
         if i == 0:
             ax.set_title('DM-poor minus DM-rich', fontsize=fs*1.1)
+            ax.text(0.85, 0.2, "MB", fontsize = 0.99*12)
+        elif i == 1:
+            ax.text(0.85, 1.2, "SB", fontsize = 0.99*12)
 
         # -----------------------------
         # RIGHT AXIS: population counts
@@ -224,8 +346,17 @@ def plot_signal_scan(df_results, score_df=None,
 
 #%%
 
-fig, axs, axs_right = plot_signal_scan(results_dense, score_df=score_dense)
-
+fig, axs, axs_right = plot_signal_scan(
+    results_dense,
+    score_df=None,
+    sample_classes=('CompactsMB', 'CompactsSB'),
+    signal_order=('zentry', 'm200', 'rmean', 'rmin'),
+    threshold_ref=0.7,
+    threshold_marks=(0.5, 0.8),
+    figsize=(4.8, 4.5),
+    show_counts=True,
+    counts_as_step=True,
+)
 
 pathBase =  os.getenv("HOME")+'/TNG_Analyzes/Figs/TNG50/'
  
