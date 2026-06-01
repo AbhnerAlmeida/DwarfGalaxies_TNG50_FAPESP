@@ -511,19 +511,49 @@ def _scatter_with_colorbar(
         #     cmap=cmap, norm=norm_for_colorbar,
         # )
         # return sc, norm_for_colorbar
-        color_values = color_values.astype(float)
+        # color_values = color_values.astype(float)
 
-        # limites dos bins
+        # # limites dos bins
+        # bounds = [0.0, 0.5, 1.0, 1.5, 2.0]
+    
+        # # pega 4 cores discretas do cmap original
+        # base_cmap = plt.get_cmap(cmap)
+        # discrete_colors = base_cmap(np.linspace(0.05, 1.0, 4))
+        # cmap_disc = mcolors.ListedColormap(discrete_colors)
+    
+        # # normalização discreta
+        # norm_for_colorbar = mcolors.BoundaryNorm(bounds, cmap_disc.N, clip=True)
+    
+        # sc = ax.scatter(
+        #     x, y,
+        #     c=color_values,
+        #     ls = lines(names_l),
+        #     edgecolor=edgecolor,
+        #     alpha=alpha_scatter,
+        #     lw=1.2 * linewidth,
+        #     marker=marker,
+        #     s=size,
+        #     cmap=cmap_disc,
+        #     norm=norm_for_colorbar,
+        # )
+        
+        # color_values = np.asarray(color_values, dtype=float)
+
+        # Bins discretos com uma quebra forte em 1
         bounds = [0.0, 0.5, 1.0, 1.5, 2.0]
-    
-        # pega 4 cores discretas do cmap original
-        base_cmap = plt.get_cmap(cmap)
-        discrete_colors = base_cmap(np.linspace(0, 1, 4))
-        cmap_disc = mcolors.ListedColormap(discrete_colors)
-    
-        # normalização discreta
+        
+        # Azul para <1, laranja/vermelho para >1
+        # Cores relativamente claras ajudam a borda/tracejado aparecer melhor.
+        colors = [
+            "#dbe9f6",  # 0.0–0.5: very light blue
+            "#6baed6",  # 0.5–1.0: blue
+            "#fdd0a2",  # 1.0–1.5: light orange
+            "#f16913",  # 1.5–2.0: orange/red
+        ]
+        
+        cmap_disc = mcolors.ListedColormap(colors, name="below_above_one")
         norm_for_colorbar = mcolors.BoundaryNorm(bounds, cmap_disc.N, clip=True)
-    
+        
         sc = ax.scatter(
             x, y,
             c=color_values,
@@ -536,7 +566,8 @@ def _scatter_with_colorbar(
             cmap=cmap_disc,
             norm=norm_for_colorbar,
         )
-    
+        
+            
         return sc, norm_for_colorbar
 
     # if colorbar_key in ["logStarZ_99", "logStarZ_99_75dex"]:
