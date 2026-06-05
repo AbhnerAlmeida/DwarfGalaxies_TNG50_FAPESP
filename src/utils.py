@@ -604,6 +604,22 @@ def _scatter_with_colorbar(
 
     #     return sc, norm_for_colorbar
     
+    if colorbar_key in ["last_look_BH"]:
+        
+        sc = ax.scatter(
+            x, y, c=color_values,
+            edgecolor='k',
+            alpha=alpha_scatter,
+            lw=0.9,
+            marker=markers(names_l+'Colorbar'),
+            s= size,
+            cmap=cmap, vmin=0, vmax=14
+        )
+
+
+        return sc, norm_for_colorbar
+    
+    
     if colorbar_key in ["logStarZ_99_75dex"]:
         
         sc = ax.scatter(
@@ -628,7 +644,7 @@ def _scatter_with_colorbar(
 
     sc = ax.scatter(
         x, y, c=color_values,
-        edgecolor=edgecolors.get(names_l + "Colorbar", None),
+        edgecolor=edgecolors(names_l + "Colorbar"),
         alpha=alpha_scatter, lw=lw, marker=marker,
         s=size, cmap=cmap,
         vmin=vmin, vmax=vmax,

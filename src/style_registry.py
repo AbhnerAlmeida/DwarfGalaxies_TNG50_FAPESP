@@ -775,6 +775,10 @@ labelsequal = {
 
     'CumulativeCorotateFraction': r'$f_{\mathrm{acc,\, Corotate}}$',
 
+    'mean_logBHmass': r'$\overline{\log( M/\mathrm{M}_\odot)}$',
+    'dt_BH': r'$\Delta t_{\mathrm{with BH}}$ [Gyr]',
+    'last_look_BH': 'Lookback time of \n last epoch with BH [Gyr]',
+    'size_before_BH': r'$\log(r_{1/2} / \mathrm{kpc})_\mathrm{before BH}$'
 
     }
 
@@ -940,8 +944,10 @@ labels = {
 
     'CumulativeCorotateFraction': r'$f_{\mathrm{acc,\, Corotate}}$',
 
-
-    
+    'mean_logBHmass': r'$\overline{\log( M/\mathrm{M}_\odot)}$',
+    'dt_BH': r'$\Delta t_{\mathrm{with BH}}$ [Gyr]',
+    'last_look_BH': 'Lookback time of \n last epoch with BH [Gyr]',
+    'size_before_BH': r'$\log(r_{1/2} / \mathrm{kpc})_\mathrm{before BH}$'
     }
 
 texts = {

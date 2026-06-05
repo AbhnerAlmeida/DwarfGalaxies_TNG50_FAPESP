@@ -996,21 +996,24 @@ def PlotMedianEvolution(
                             # entry markers
                             if EntryMedian:
                                 dfPop = TNG.extractPopulation(names[l] + column, dfName=dfName)
-                                snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
-                                if not np.isnan(snap_first):
-                                   x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
-                                   ax.axvline( x_entry,
-                                               color=colors(names[l]),
-                                               lw=0.8, ls = 'dashed',
-                                               alpha=0.8, zorder = 0)
-                                   # ax.plot(
-                                   #      [x_entry, x_entry], [0.98, 1.03],
-                                   #      transform=ax.get_xaxis_transform(),
-                                   #      color=colors(names[l]),
-                                   #      lw=2.6,
-                                   #      alpha=1.,
-                                   #      clip_on=False
-                                   #  )
+                                try:
+                                    snap_first = int(np.nanmedian(dfPop.Snap_At_FirstEntry))
+                                    if not np.isnan(snap_first):
+                                       x_entry = dfTime.Age.loc[dfTime.Snap == snap_first].values[0]
+                                       ax.axvline( x_entry,
+                                                   color=colors(names[l]),
+                                                   lw=0.8, ls = 'dashed',
+                                                   alpha=0.8, zorder = 0)
+                                       # ax.plot(
+                                       #      [x_entry, x_entry], [0.98, 1.03],
+                                       #      transform=ax.get_xaxis_transform(),
+                                       #      color=colors(names[l]),
+                                       #      lw=2.6,
+                                       #      alpha=1.,
+                                       #      clip_on=False
+                                       #  )
+                                except:
+                                    None
 
                         else:
                             x = _safe_array(dataX[l])
@@ -1406,6 +1409,7 @@ def PlotHist(
                     density=density, linewidth=linewidth)
             return
         
+        
         if param == 'deltaSize_at_Entry':
             bins_edges = np.linspace(-1.5, 3.5, 11)
             ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
@@ -1422,6 +1426,13 @@ def PlotHist(
         
         if param == 'sSFRinHalfRadAfterz5':
             bins_edges = np.linspace(-11.8, -9.2, 9)
+            ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
+                    color=colors(name_key), ls=lines(name_key),
+                    density=density, linewidth=linewidth)
+            return
+        
+        if 'logSUM_Mstar_merger' in param:
+            bins_edges = np.linspace(4.8, 8.2, 7)
             ax.hist(v, bins=bins_edges, alpha=1, histtype='step',
                     color=colors(name_key), ls=lines(name_key),
                     density=density, linewidth=linewidth)
@@ -1704,7 +1715,7 @@ def PlotScatter(
     All=None, COLORBAR=None, MarkerSizes=None, NoneEdgeColor=False,
 
     # --- Statistics ---
-    medianBins=False, medianAll=False, medianDot=False, SpearManTest=False, SpearManTestAll=False,
+    medianBins=False, medianAll=False, medianDotStar = False, medianDot=False, SpearManTest=False, SpearManTestAll=False,
     bins=10, quantile=0.95, q=0.95, HIGHLIGHTPoints=False,
 
     # --- Layout ---
@@ -2209,16 +2220,30 @@ def PlotScatter(
 
                 elif medianDot:
                     if COLORBAR is not None :
-                        
-                        ax.scatter(
-                            np.nanmedian(x_plot), np.nanmedian(y_plot),
-                            marker=markers(name+'Colorbar'), edgecolor='red', facecolor = 'none', # c =colors(name), 
-                            s=1.5*msizet * msize(name+'Colorbar'), lw=1.7, zorder = 20, alpha = 1.
-                        )
+                        if medianDotStar:
+                            ax.scatter(
+                                np.nanmedian(x_plot), np.nanmedian(y_plot),
+                                marker='*', edgecolor='black', c =colors(name), 
+                                s=55*msizet , lw=0.8, zorder = 20, alpha = 1.
+                            )
+
+                        else:
+                            if COLORBAR[0] == 'last_look_BH':
+                                ax.scatter(
+                                    np.nanmedian(x_plot), np.nanmedian(y_plot),
+                                    marker=markers(name+'Colorbar'), edgecolor='red', c = colors(name), 
+                                    s=2*msizet * msize(name+'Colorbar'), lw=1.7, zorder = 20, alpha = 1.
+                                )
+                            else:
+                                ax.scatter(
+                                    np.nanmedian(x_plot), np.nanmedian(y_plot),
+                                    marker=markers(name+'Colorbar'), edgecolor='red', facecolor = 'none', # c =colors(name), 
+                                    s=1.5*msizet * msize(name+'Colorbar'), lw=1.7, zorder = 20, alpha = 1.
+                                )
                     else:
                         ax.scatter(
                             np.nanmedian(x_plot), np.nanmedian(y_plot),
-                            marker='*', edgecolor='red', c =colors(name), 
+                            marker='*', edgecolor='black', c =colors(name), 
                             s=55*msizet , lw=0.8, zorder = 20, alpha = 1.
                         )
 
@@ -2295,16 +2320,23 @@ def PlotScatter(
             # X label on last row
             if i == len(ParamsY) - 1:
                 if len(ParamsX) > 1 and label_general:
-                    ax.set_xlabel(labelsequal.get(ParamsX[j], ParamsX[j]), fontsize=1.2 * fontlabel)
-                    if  ParamsX[j] == 'z_Birth':
-                        ax.set_xscale('symlog',linthresh=0.05)
-                        ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
-                        ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
-                        
+                    unique_count = len(set(ParamsX))
+                    if unique_count == 1:
+                        ax.set_xlabel(labelsequal.get(ParamsX[0], ParamsX[0]), fontsize=1.2 * fontlabel)
+                        ax.set_xscale(scales(ParamsX[0]))
+                        if scales(ParamsX[0]) in ("log", "symlog") and not ParamsX[0] == 'z_Birth':
+                            ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
                     else:
-                        ax.set_xscale(scales(ParamsX[j]))
-                    if scales(ParamsX[j]) in ("log", "symlog") and not ParamsX[j] == 'z_Birth':
-                        ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+                        ax.set_xlabel(labelsequal.get(ParamsX[j], ParamsX[j]), fontsize=1.2 * fontlabel)
+                        if  ParamsX[j] == 'z_Birth':
+                            ax.set_xscale('symlog',linthresh=0.05)
+                            ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
+                            ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
+                            
+                        else:
+                            ax.set_xscale(scales(ParamsX[j]))
+                        if scales(ParamsX[j]) in ("log", "symlog") and not ParamsX[j] == 'z_Birth':
+                            ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
                 
                 
                 else:
@@ -2320,8 +2352,9 @@ def PlotScatter(
                         ax.set_xscale('symlog',linthresh=0.02)
                         ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
                         ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
-                        
-                    if  ParamsX[j] == 'z_Birth':
+ 
+                    if  ParamsX == 'z_Birth':
+
                         ax.set_xscale('symlog',linthresh=0.02)
                         ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
                         ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
