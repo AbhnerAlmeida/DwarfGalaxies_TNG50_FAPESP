@@ -514,7 +514,7 @@ BASE_markers = {
     'LoseTheirGas': 'o',
     
     'SubDiffuseColorbar': 'H',
-    'DiffuseColorbar': 's',
+    'DiffuseColorbar': 'D',
 
     'GAMAColorbar': '*', 
     
@@ -528,8 +528,12 @@ BASE_markers = {
 
 BASE_msize = {
     #Size classes
-    'Normal': 3.3,
+    'Normal': 2.6,
     'NormalDif': 3.3,
+    
+    #Colorbar
+    'Diffuse': 5,
+    'SubDiffuse': 2.6,
 
     #Special classes
     'SBCBornYoung': 11,
@@ -546,6 +550,8 @@ BASE_msize = {
     #Colorbar
     'NormalColorbar': 8,
     'SubDiffuseColorbar': 8,
+    'DiffuseColorbar': 6,
+
     'GAMAColorbar': 9.5, 
     
     'SatelliteDontLoseTheirGasColorbar': 36,
@@ -817,8 +823,8 @@ labels = {
     'Mstar_Norm_Max': r'$(M/ M_\mathrm{max})_\star$',
     'Mbar_Norm_Max': r'$(M/ M_\mathrm{max})_\mathrm{bar}$',
 
-    'GasFrac_99': r'$(M_\mathrm{gas}/ M)_{z = 0}$',
-    'StarFrac_99': r'$(M_\star/ M)_{z = 0}$',
+    'GasFrac_99': r'$f_{\rm gas,\,z=0}$',
+    'StarFrac_99': r'$f_{\rm \star,\,z=0}$',
     'DMFrac_99': r'$f_{\rm DM,\,z=0}$',
     
     'MassIn_Infall_to_GasLost': r'$(\Delta M_\star)_{\mathrm{inner}}^\mathrm{entry-to-gas-loss} / M_\star^\mathrm{entry}$', #'Relative inner stellar mass \n change during period', #
@@ -892,6 +898,9 @@ labels = {
     
     'rToRNearYoung': r'$d_{\mathrm{NNB}}$ [kpc]', 
     'r_over_R_Crit200': r'$R/R_{200}$',
+    
+    'logM200_99': r'$\log(M_{200}/\mathrm{M}_\odot)_{z = 0}$',
+    'roverR200_99': r'$(R/R_{200})_{z = 0}$',
 
 
     #AngularMomentum

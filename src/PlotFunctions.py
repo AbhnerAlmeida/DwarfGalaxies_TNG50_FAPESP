@@ -44,6 +44,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.ticker import FixedLocator
 from matplotlib.ticker import FixedFormatter
 from matplotlib.offsetbox import AnchoredText
+from matplotlib.gridspec import GridSpec
 
 from matplotlib.patches import Circle
 from matplotlib.legend_handler import HandlerPatch
@@ -204,13 +205,16 @@ def Legend(names, mult = 2, msizeMult= .6, linewidth = 1.5):
             if name == 'Bian et al. (2025)':
                 custom_lines.append(Patch(facecolor='tab:red', alpha = 0.4))
             else:
-                if 'Normal' in name:
-                    msizeMult = 1.8
+                if 'Normal' in name or 'SubDiffuse' in name:
+                    msizeMult = 1.9
                     
                     if 'Colorbar' in name:
                         msizeMult = 0.8
+                        
+                elif 'Diffuse' in name:
+                    msizeMult = 1.1
                     
-                if 'SBC' in name or 'MBC' in name  or 'Diffuse' in name:
+                elif 'SBC' in name or 'MBC' in name :
                     msizeMult = 0.8
                 if 'LoseTheirGas' in name:
                     msizeMult = 0.8
@@ -1728,7 +1732,7 @@ def PlotScatter(
     xlimmin=None, xlimmax=None, ylimmin=None, ylimmax=None,
 
     # --- Style ---
-    cmap="inferno", m="o", msizet=30, msizeMult=1, alphaScater=1.0, alphaShade=0.3, linewidth=1.2, fontlabel=26, framealpha=0.95,
+    cmap="inferno", m="o", msizet=30, msizetstar = 30, msizeMult=1, alphaScater=1.0, alphaShade=0.3, linewidth=1.2, fontlabel=26, framealpha=0.95,
 
     # --- Legend ---
     legend=False,LegendNames=None, legpositions=None, loc="best", columnspacing=0.5,
@@ -1893,6 +1897,7 @@ def PlotScatter(
         Place ALL your special-case quadrant fills / guide lines / custom ticks here.
         """
         # --- Special rules (subset copied from your original) ---
+        
 
         if (ParamX == "MassIn_Infall_to_GasLost") and (ParamsY[0] == "MassAboveAfter_Infall_to_GasLost"):
             x = np.linspace(0, 1)
@@ -1979,10 +1984,15 @@ def PlotScatter(
             ax.fill_between(xfitline, xfitline, 1, alpha=0.2, color="tab:red")
             ax.text(-4.0, -1, "SF", fontsize=0.99 * fontlabel)
             
-        elif  ('StarFrac' in ParamX  and (('GasFrac' in firstY) or ('DMFrac' in firstY)) )  :
+        elif  'StarFrac' in ParamX  and 'GasFrac' in firstY  :
 
             x = np.linspace(0, 1)
-            ax.plot( x, x, ls='--', color='tab:blue', linewidth=linewidth)
+            ax.plot( x, x, ls='--', color='gray', linewidth=linewidth, zorder = 0)
+            
+        elif  'StarFrac' in ParamX  and 'DMFrac' in firstY:
+
+            x = np.linspace(0, 1)
+            ax.plot( x, 1 - x, ls='dotted', color='gray', linewidth=linewidth, zorder = 0)
             
         elif  ('z_Birth' in ParamX  and ('DMFrac_Birth' in firstY) ) :
 
@@ -2152,6 +2162,9 @@ def PlotScatter(
             # Special background rules (quadrants, guide lines, etc.)
            
             _apply_special_background_rules(ax, ParamX, ParamsY[0], linewidth, fontlabel)
+            if i == 1 and yparam == 'DMFrac_99' and ParamX == 'StarFrac_99':
+                _apply_special_background_rules(ax, ParamX, yparam, linewidth, fontlabel)
+
             # Background "All" layer
             if All is not None:
                 xAll = All[ParamX]
@@ -2195,6 +2208,7 @@ def PlotScatter(
 
                 # Spearman test per group
                 if SpearManTest and not SpearManTestAll:
+                    
                     corr, pval = spearmanr(
                         x_plot[(~np.isnan(x_plot)) & (~np.isinf(x_plot))],
                         y_plot[(~np.isnan(x_plot)) & (~np.isinf(x_plot))],
@@ -2224,7 +2238,7 @@ def PlotScatter(
                             ax.scatter(
                                 np.nanmedian(x_plot), np.nanmedian(y_plot),
                                 marker='*', edgecolor='black', c =colors(name), 
-                                s=55*msizet , lw=0.8, zorder = 20, alpha = 1.
+                                s=30*msizetstar , lw=1.1, zorder = 20, alpha = 1.
                             )
 
                         else:
@@ -2244,7 +2258,7 @@ def PlotScatter(
                         ax.scatter(
                             np.nanmedian(x_plot), np.nanmedian(y_plot),
                             marker='*', edgecolor='black', c =colors(name), 
-                            s=55*msizet , lw=0.8, zorder = 20, alpha = 1.
+                            s=33*msizet , lw=1.3, zorder = 20, alpha = 1.
                         )
 
                 elif medianAll:
@@ -2266,13 +2280,27 @@ def PlotScatter(
 
             # Spearman test using all points in this panel
             if SpearManTestAll:
+                
                 cond = (
                     (~np.isnan(XAllSMT)) & (~np.isinf(XAllSMT))
                     & (~np.isnan(YAllSMT)) & (~np.isinf(YAllSMT))
                 )
-                corr, pval = spearmanr(XAllSMT[cond], YAllSMT[cond])
-                print("Panel Spearman corr:", corr, "p:", pval)
-
+                if CAllSMT is not None and cvals is not None:
+                    corr, pval = spearmanr(XAllSMT[cond], YAllSMT[cond])
+                    print("Panel Spearman X and Y corr:", corr, "p:", pval)
+                    cond = (
+                        (~np.isnan(XAllSMT)) & (~np.isinf(XAllSMT))
+                        & (~np.isnan(CAllSMT)) & (~np.isinf(CAllSMT))
+                    )
+                    corr, pval = spearmanr(XAllSMT[cond], CAllSMT[cond])
+                    print("Panel Spearman X and Colorbar corr:", corr, "p:", pval)
+                    cond = (
+                        (~np.isnan(CAllSMT)) & (~np.isinf(CAllSMT))
+                        & (~np.isnan(YAllSMT)) & (~np.isinf(YAllSMT))
+                    )
+                    corr, pval = spearmanr(CAllSMT[cond], YAllSMT[cond])
+                    print("Panel Spearman Colorbar and Y corr:", corr, "p:", pval)
+                    print('\n')
             # Equal line if requested
             if EqualLine and (EqualLineMin is not None) and (EqualLineMax is not None):
                 xx = np.linspace(EqualLineMin, EqualLineMax)
@@ -2402,6 +2430,800 @@ def PlotScatter(
     savefig(savepath, savefigname, TRANSPARENT)
     return
 
+def PlotScatterJoint(
+    # --- Data / what to plot ---
+    names,
+    columns,
+    ParamX,
+    ParamsY,
+    Type="z0",
+    snap=(99,),
+    dfName="PaperIII",
+    SampleName="Samples",
+    Name="Name",
+
+    # --- Optional direct DataFrame mode ---
+    DataFrame=None,
+    columnFilter=None,
+
+    # --- Marginal histograms ---
+    hist=True,
+    histDensity=True,
+    sameHistBins=True,
+    binsHist=22,
+
+    # --- 2D density background ---
+    density_background=False,
+    densityMode="class",      # "class" or "all"
+    density_bins=28,
+    density_levels=(0.25, 0.50, 0.75),
+    density_alpha=0.25,
+    density_cmap="Greys",
+
+    # --- Statistics ---
+    medianBins=False,
+    medianDot=False,
+    bins=8,
+    quantile=0.68,
+    min_points_per_bin=5,
+
+    # --- Extra guide lines ---
+    guide_hlines=None,
+    guide_vlines=None,
+    EqualLine=False,
+
+    # --- Layout ---
+    figsize=(8.0, 7.2),
+    xscale=None,
+    yscales=None,
+    GridMake=False,
+    title=None,
+
+    # --- Limits ---
+    xlim=None,
+    ylim=None,
+    clipToLimits=True,
+
+    # --- Cleaning ---
+    removeNaN=True,
+    removeInf=True,
+    positiveForLog=True,
+
+    # --- Style ---
+    msizet=15, 
+    alphaScater=1,
+    linewidth=1.2,
+    fontlabel=22,
+    framealpha=0.95,
+
+    # --- Legend ---
+    legend=True,
+    loc="best",
+
+    # --- IO ---
+    save=True,
+    savepath="fig/PlotScatterJoint",
+    savefigname="fig",
+    TRANSPARENT=False,
+    dpi=300,
+
+    # --- Return ---
+    returnData=False,
+
+    # --- Reproducibility ---
+    seed=16010504,
+):
+    """
+    Scatter plot with marginal density histograms.
+
+    This function is designed as a more specific companion to PlotScatter:
+    it keeps the same input logic based on names, columns, ParamX, ParamsY,
+    and TNG.makedata, but builds one joint scatter + marginal histogram
+    figure for each Y parameter and each column.
+
+    Main use cases:
+    - Compare Normal vs Diffuse with very different sample sizes.
+    - Use density-normalized marginal histograms.
+    - Force identical histogram bins for all classes.
+    - Add 2D density contours/background.
+    - Preserve the same color/marker/label conventions used elsewhere.
+
+    Returns
+    -------
+    results : dict
+        Dictionary keyed by (yparam, column), containing:
+        fig, axes, data, stats.
+    """
+
+    np.random.seed(seed)
+
+    # ------------------------------------------------------------------
+    # Small robust helpers
+    # ------------------------------------------------------------------
+    def _as_list(x):
+        if isinstance(x, (list, tuple, np.ndarray)):
+            return list(x)
+        return [x]
+
+    def _normalize_inputs(ParamX, ParamsY):
+        Ys = _as_list(ParamsY)
+
+        if isinstance(ParamX, (list, tuple, np.ndarray)):
+            Xs = list(ParamX)
+            if len(Xs) == 1:
+                Xs = Xs * len(Ys)
+            elif len(Xs) != len(Ys):
+                raise ValueError(
+                    "ParamX must be scalar, length 1, or have the same length as ParamsY."
+                )
+        else:
+            Xs = [ParamX] * len(Ys)
+
+        return Xs, Ys
+
+    # ------------------------------------------------------------------
+    # Data loading
+    # ------------------------------------------------------------------
+    def _load_data_from_TNG(names, columns, ParamsX, ParamsY):
+        """
+        Uses the same expected TNG.makedata logic as PlotScatter.
+
+        Expected output indexing:
+            dataX[i][j][l]
+            dataY[i][j][l]
+
+        where:
+            i = y parameter index
+            j = column/panel index
+            l = class/name index
+        """
+
+        cols = _as_list(columns)
+
+        if cols == ["Snap"]:
+            panel_columns = list(snap)
+            dataX = TNG.makedata(
+                names, panel_columns, ParamsX, "Snap",
+                snap=snap,
+                SampleName=SampleName,
+                dfName=dfName,
+                Name=Name,
+            )
+            dataY = TNG.makedata(
+                names, panel_columns, ParamsY, "Snap",
+                snap=snap,
+                SampleName=SampleName,
+                dfName=dfName,
+                Name=Name,
+            )
+        else:
+            panel_columns = cols
+            dataX = TNG.makedata(
+                names, panel_columns, ParamsX, Type,
+                snap=snap,
+                SampleName=SampleName,
+                dfName=dfName,
+                Name=Name,
+            )
+            dataY = TNG.makedata(
+                names, panel_columns, ParamsY, Type,
+                snap=snap,
+                SampleName=SampleName,
+                dfName=dfName,
+                Name=Name,
+            )
+
+        return panel_columns, dataX, dataY
+
+    def _load_data_from_dataframe(df, names, columns, xparam, yparam):
+        """
+        Optional fallback mode if you already have a DataFrame.
+        This assumes:
+            - class column is given by Name
+            - xparam and yparam are columns in df
+            - if columnFilter is provided, it filters the sample/environment.
+        """
+
+        out = []
+
+        for cname in names:
+            d = df.copy()
+
+            if Name in d.columns:
+                d = d[d[Name] == cname]
+
+            if columnFilter is not None:
+                for key, val in columnFilter.items():
+                    if isinstance(val, (list, tuple, np.ndarray)):
+                        d = d[d[key].isin(val)]
+                    else:
+                        d = d[d[key] == val]
+
+            x = d[xparam].values
+            y = d[yparam].values
+            out.append((cname, x, y))
+
+        return out
+
+    # ------------------------------------------------------------------
+    # Cleaning and binning
+    # ------------------------------------------------------------------
+    def _clean_xy(x, y, xscale_this="linear", yscale_this="linear"):
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+
+        good = np.ones(len(x), dtype=bool)
+
+        if removeNaN:
+            good &= ~np.isnan(x)
+            good &= ~np.isnan(y)
+
+        if removeInf:
+            good &= np.isfinite(x)
+            good &= np.isfinite(y)
+
+        if positiveForLog:
+            if xscale_this == "log":
+                good &= x > 0
+            if yscale_this == "log":
+                good &= y > 0
+
+        if xlim is not None and clipToLimits:
+            good &= (x >= xlim[0]) & (x <= xlim[1])
+
+        if ylim is not None and clipToLimits:
+            good &= (y >= ylim[0]) & (y <= ylim[1])
+
+        return x[good], y[good]
+
+    def _auto_limits(values, user_lim=None, scale="linear", pad_frac=0.05):
+        values = np.asarray(values, dtype=float)
+        values = values[np.isfinite(values)]
+
+        if scale == "log":
+            values = values[values > 0]
+
+        if user_lim is not None:
+            return user_lim
+
+        if len(values) == 0:
+            return None
+
+        vmin = np.nanmin(values)
+        vmax = np.nanmax(values)
+
+        if vmin == vmax:
+            if scale == "log":
+                return (vmin / 1.5, vmax * 1.5)
+            return (vmin - 0.5, vmax + 0.5)
+
+        if scale == "log":
+            logmin = np.log10(vmin)
+            logmax = np.log10(vmax)
+            pad = pad_frac * (logmax - logmin)
+            return (10 ** (logmin - pad), 10 ** (logmax + pad))
+
+        pad = pad_frac * (vmax - vmin)
+        return (vmin - pad, vmax + pad)
+
+    def _make_bins(values, bins, lim, scale="linear"):
+        values = np.asarray(values, dtype=float)
+        values = values[np.isfinite(values)]
+
+        if lim is None:
+            lim = _auto_limits(values, None, scale)
+
+        if lim is None:
+            return np.linspace(0, 1, bins + 1)
+
+        lo, hi = lim
+
+        if scale == "log":
+            lo = max(lo, np.nanmin(values[values > 0]))
+            return np.logspace(np.log10(lo), np.log10(hi), bins + 1)
+
+        return np.linspace(lo, hi, bins + 1)
+
+    def _split_quantiles(x, y, edges, q=0.68):
+        x = np.asarray(x)
+        y = np.asarray(y)
+
+        xmid, ymed, ylo, yhi = [], [], [], []
+
+        qlo = 50.0 * (1.0 - q)
+        qhi = 100.0 - qlo
+
+        for k in range(len(edges) - 1):
+            lo, hi = edges[k], edges[k + 1]
+            cond = (x >= lo) & (x < hi)
+
+            if np.sum(cond) < min_points_per_bin:
+                continue
+
+            yy = y[cond]
+            xmid.append(0.5 * (lo + hi))
+            ymed.append(np.nanmedian(yy))
+            ylo.append(np.nanpercentile(yy, qlo))
+            yhi.append(np.nanpercentile(yy, qhi))
+
+        return np.asarray(xmid), np.asarray(ymed), np.asarray(ylo), np.asarray(yhi)
+
+    def _make_stats(class_data):
+        rows = []
+
+        for cname, x, y in class_data:
+            if len(x) == 0:
+                rows.append({
+                    "Name": cname,
+                    "N": 0,
+                    "median_x": np.nan,
+                    "median_y": np.nan,
+                    "p16_y": np.nan,
+                    "p84_y": np.nan,
+                })
+                continue
+
+            rows.append({
+                "Name": cname,
+                "N": len(x),
+                "median_x": np.nanmedian(x),
+                "median_y": np.nanmedian(y),
+                "p16_y": np.nanpercentile(y, 16),
+                "p84_y": np.nanpercentile(y, 84),
+            })
+
+        try:
+            import pandas as pd
+            return pd.DataFrame(rows)
+        except Exception:
+            return rows
+
+    # ------------------------------------------------------------------
+    # Plotting helpers
+    # ------------------------------------------------------------------
+    def _add_density(ax, class_data, xedges, yedges):
+        if not density_background:
+            return
+
+        if densityMode == "all":
+            allx = np.concatenate([d[1] for d in class_data if len(d[1]) > 0])
+            ally = np.concatenate([d[2] for d in class_data if len(d[2]) > 0])
+
+            if len(allx) < 5:
+                return
+
+            H, xe, ye = np.histogram2d(allx, ally, bins=[xedges, yedges])
+            H = H.T.astype(float)
+
+            if np.nanmax(H) <= 0:
+                return
+
+            H = H / np.nanmax(H)
+            H[H <= 0] = np.nan
+
+            xc = 0.5 * (xe[:-1] + xe[1:])
+            yc = 0.5 * (ye[:-1] + ye[1:])
+            X, Y = np.meshgrid(xc, yc)
+
+            levels = np.array(density_levels)
+            levels = levels[(levels > 0) & (levels < 1)]
+
+            if len(levels) > 0:
+                ax.contourf(
+                    X, Y, H,
+                    levels=np.r_[levels, 1.0],
+                    cmap=density_cmap,
+                    alpha=density_alpha,
+                    zorder=0,
+                )
+
+        elif densityMode == "class":
+            for cname, x, y in class_data:
+                if len(x) < 8:
+                    continue
+
+                H, xe, ye = np.histogram2d(x, y, bins=[xedges, yedges])
+                H = H.T.astype(float)
+
+                if np.nanmax(H) <= 0:
+                    continue
+
+                H = H / np.nanmax(H)
+                H[H <= 0] = np.nan
+
+                xc = 0.5 * (xe[:-1] + xe[1:])
+                yc = 0.5 * (ye[:-1] + ye[1:])
+                X, Y = np.meshgrid(xc, yc)
+
+                levels = np.array(density_levels)
+                levels = levels[(levels > 0) & (levels < 1)]
+
+                if len(levels) > 0:
+                    ax.contour(
+                        X, Y, H,
+                        levels=levels,
+                        colors=colors(cname),
+                        linewidths=linewidth,
+                        alpha=0.75,
+                        zorder=2,
+                    )
+
+    def _plot_one_joint(xparam, yparam, col_label, class_data, i_y):
+        xscale_this = scales(xparam)
+        yscale_this = scales(yparam)
+
+        allx = np.concatenate([d[1] for d in class_data if len(d[1]) > 0])
+        ally = np.concatenate([d[2] for d in class_data if len(d[2]) > 0])
+
+        local_xlim = _auto_limits(allx, xlim, xscale_this)
+        local_ylim = _auto_limits(ally, ylim, yscale_this)
+
+        if sameHistBins:
+            xedges_hist = _make_bins(allx, binsHist, local_xlim, xscale_this)
+            yedges_hist = _make_bins(ally, binsHist, local_ylim, yscale_this)
+        else:
+            xedges_hist = None
+            yedges_hist = None
+
+        xedges_density = _make_bins(allx, density_bins, local_xlim, xscale_this)
+        yedges_density = _make_bins(ally, density_bins, local_ylim, yscale_this)
+
+        fig = plt.figure(figsize=figsize)
+
+        gs = GridSpec(
+            2, 2,
+            width_ratios=[4.0, 1.15],
+            height_ratios=[1.15, 4.0],
+            hspace=0.04,
+            wspace=0.04,
+        )
+
+        ax = fig.add_subplot(gs[1, 0])
+        ax_histx = fig.add_subplot(gs[0, 0], sharex=ax)
+        ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
+        ax_empty = fig.add_subplot(gs[0, 1])
+        ax_empty.axis("off")
+
+        axes = {
+            "main": ax,
+            "histx": ax_histx,
+            "histy": ax_histy,
+        }
+
+        # Density behind points
+        _add_density(ax, class_data, xedges_density, yedges_density)
+
+        # Scatter and histograms
+        for cname, x, y in class_data:
+            if len(x) == 0:
+                continue
+            c = colors(cname)
+            mk = markers(cname)
+            
+            if cname != 'SubDiffuse':
+
+                ax.scatter(
+                    x,
+                    y,
+                    color=c,
+                    edgecolor=edgecolors(cname),
+                    marker=mk,
+                    s=msizet * msize(cname),
+                    alpha=alphaScater,
+                    lw=0.8,
+                    label=cname,
+                    zorder=3,
+                )
+
+            if hist:
+                if sameHistBins:
+                    xb = xedges_hist
+                    yb = yedges_hist
+                else:
+                    xb = _make_bins(x, binsHist, local_xlim, xscale_this)
+                    yb = _make_bins(y, binsHist, local_ylim, yscale_this)
+            
+                ax_histx.hist(
+                    x,
+                    bins=xb,
+                    histtype="step",
+                    density=histDensity,
+                    color=c,
+                    lw=linewidth,
+                    ls=lines(cname),
+                )
+            
+                ax_histy.hist(
+                    y,
+                    bins=yb,
+                    histtype="step",
+                    density=histDensity,
+                    color=c,
+                    lw=linewidth,
+                    ls=lines(cname),
+                    orientation="horizontal",
+                )
+            
+                # Median lines in the marginal histograms
+                if len(x) > 0:
+                    ax_histx.axvline(
+                        np.nanmedian(x),
+                        color=c,
+                        lw=linewidth,
+                        ls="--",
+                        alpha=0.9,
+                        zorder=10,
+                    )
+            
+                if len(y) > 0:
+                    ax_histy.axhline(
+                        np.nanmedian(y),
+                        color=c,
+                        lw=linewidth,
+                        ls="--",
+                        alpha=0.9,
+                        zorder=10,
+                    )
+            if medianDot:
+                ax.scatter(
+                    np.nanmedian(x),
+                    np.nanmedian(y),
+                    marker="*",
+                    s=5.0 * msizet,
+                    color=c,
+                    edgecolor="black",
+                    lw=0.8,
+                    zorder=10,
+                )
+
+            if medianBins:
+                xmedges = _make_bins(allx, bins, local_xlim, xscale_this)
+                xm, ym, ylo, yhi = _split_quantiles(
+                    x, y, xmedges, q=quantile
+                )
+
+                if len(xm) > 0:
+                    ax.plot(
+                        xm,
+                        ym,
+                        color=c,
+                        lw=linewidth,
+                        marker=mk,
+                        ms=6,
+                        zorder=8,
+                    )
+
+                    ax.fill_between(
+                        xm,
+                        ylo,
+                        yhi,
+                        color=c,
+                        alpha=0.18,
+                        zorder=7,
+                    )
+
+        # Guide lines
+        if guide_hlines is not None:
+            for yy in _as_list(guide_hlines):
+                ax.axhline(
+                    yy,
+                    color="black",
+                    ls="--" if yy == 1.0 else ":",
+                    lw=1.1,
+                    alpha=0.75,
+                    zorder=1,
+                )
+
+        if guide_vlines is not None:
+            for xx in _as_list(guide_vlines):
+                ax.axvline(
+                    xx,
+                    color="black",
+                    ls=":",
+                    lw=1.1,
+                    alpha=0.75,
+                    zorder=1,
+                )
+
+        if EqualLine:
+            lo = max(local_xlim[0], local_ylim[0])
+            hi = min(local_xlim[1], local_ylim[1])
+            xx = np.linspace(lo, hi, 100)
+            ax.plot(xx, xx, color="black", ls="--", lw=1.0, zorder=1)
+
+        # Axis formatting
+        ax.set_xlim(local_xlim)
+        ax.set_ylim(local_ylim)
+
+        ax.set_xscale(xscale_this)
+        ax.set_yscale(yscale_this)
+
+        ax_histx.set_xscale(xscale_this)
+        ax_histy.set_yscale(yscale_this)
+
+        if xscale_this in ["log", "symlog"]:
+            ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+
+
+        if yscale_this in ["log", "symlog"]:
+            ax.yaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+
+        ax.set_xlabel(labels.get(xparam, xparam), fontsize=fontlabel)
+        ax.set_ylabel(labels.get(yparam, yparam), fontsize=fontlabel)
+
+        if histDensity:
+            ax_histx.set_ylabel("density", fontsize=0.75 * fontlabel)
+            ax_histy.set_xlabel("density", fontsize=0.75 * fontlabel)
+        else:
+            ax_histx.set_ylabel("N", fontsize=0.75 * fontlabel)
+            ax_histy.set_xlabel("N", fontsize=0.75 * fontlabel)
+
+        ax.tick_params(axis="both", labelsize=0.85 * fontlabel)
+        ax_histx.tick_params(axis="y", labelsize=0.70 * fontlabel)
+        ax_histy.tick_params(axis="x", labelsize=0.70 * fontlabel)
+
+        plt.setp(ax_histx.get_xticklabels(), visible=False)
+        plt.setp(ax_histy.get_yticklabels(), visible=False)
+
+        if GridMake:
+            ax.grid(
+                True,
+                color="#9e9e9e",
+                which="major",
+                linewidth=0.6,
+                alpha=0.3,
+                linestyle=":",
+            )
+
+        if legend:
+            ax.legend(
+                loc=loc,
+                fontsize=0.78 * fontlabel,
+                framealpha=framealpha,
+            )
+
+        if title:
+            if col_label is not None:
+                ax_histx.set_title(
+                    title,
+                    fontsize=0.88 * fontlabel,
+                )
+            else:
+                ax_histx.set_title(
+                   title,
+                    fontsize=0.88 * fontlabel,
+                )
+
+        # Cleaner marginal axes
+        ax_histx.spines["right"].set_visible(False)
+        ax_histx.spines["top"].set_visible(False)
+        ax_histy.spines["right"].set_visible(False)
+        ax_histy.spines["top"].set_visible(False)
+
+        stats = _make_stats(class_data)
+
+        return fig, axes, stats, {
+            "xparam": xparam,
+            "yparam": yparam,
+            "column": col_label,
+            "class_data": class_data,
+        }
+
+    # ------------------------------------------------------------------
+    # Main
+    # ------------------------------------------------------------------
+    names = _as_list(names)
+    columns = _as_list(columns)
+    ParamsX, ParamsY = _normalize_inputs(ParamX, ParamsY)
+
+    results = {}
+
+    if DataFrame is None:
+        panel_columns, dataX, dataY = _load_data_from_TNG(
+            names, columns, ParamsX, ParamsY
+        )
+
+        for i, yparam in enumerate(ParamsY):
+            xparam = ParamsX[i]
+            xscale_this = scales(xparam)
+            yscale_this = scales(yparam)
+
+            for j, col_label in enumerate(panel_columns):
+                class_data = []
+
+                for l, cname in enumerate(names):
+                    x = np.asarray(dataX[i][j][l], dtype=float)
+                    y = np.asarray(dataY[i][j][l], dtype=float)
+
+                    x, y = _clean_xy(
+                        x,
+                        y,
+                        xscale_this=xscale_this,
+                        yscale_this=yscale_this,
+                    )
+
+                    class_data.append((cname, x, y))
+
+                fig, axes, stats, data_out = _plot_one_joint(
+                    xparam=xparam,
+                    yparam=yparam,
+                    col_label=col_label,
+                    class_data=class_data,
+                    i_y=i,
+                )
+
+                key = (yparam, col_label)
+                results[key] = {
+                    "fig": fig,
+                    "axes": axes,
+                    "stats": stats,
+                    "data": data_out,
+                }
+
+                if save:
+                    os.makedirs(savepath, exist_ok=True)
+
+                    if len(ParamsY) == 1 and len(panel_columns) == 1:
+                        fname = f"{savefigname}.pdf"
+                    else:
+                        fname = (
+                            f"{savefigname}.pdf"
+                        )
+
+                    fig.savefig(
+                        os.path.join(savepath, fname),
+                        bbox_inches="tight",
+                        dpi=dpi,
+                        transparent=TRANSPARENT,
+                    )
+
+    else:
+        # DataFrame mode: useful if you already have PaperIII directly.
+        # In this mode, columns is only used for naming unless columnFilter is used.
+        for i, yparam in enumerate(ParamsY):
+            xparam = ParamsX[i]
+            xscale_this = scales(xparam)
+            yscale_this = scales(yparam)
+
+            class_data_raw = _load_data_from_dataframe(
+                DataFrame,
+                names,
+                columns,
+                xparam,
+                yparam,
+            )
+
+            class_data = []
+            for cname, x, y in class_data_raw:
+                x, y = _clean_xy(
+                    x,
+                    y,
+                    xscale_this=xscale_this,
+                    yscale_this=yscale_this,
+                )
+                class_data.append((cname, x, y))
+
+            col_label = columns[0] if len(columns) > 0 else None
+
+            fig, axes, stats, data_out = _plot_one_joint(
+                xparam=xparam,
+                yparam=yparam,
+                col_label=col_label,
+                class_data=class_data,
+                i_y=i,
+            )
+
+            key = (yparam, col_label)
+            results[key] = {
+                "fig": fig,
+                "axes": axes,
+                "stats": stats,
+                "data": data_out,
+            }
+
+            savefig(savepath, fname, TRANSPARENT)
+
+    return
 
 def PlotID(
     # --- Grid definition / inputs (required) ---

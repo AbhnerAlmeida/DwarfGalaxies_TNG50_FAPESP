@@ -2115,7 +2115,35 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                         if 'Star' in Param:
                             DFs[l][str(ID)][99 - snap] = np.nansum(massStar[Cond]*ZStar[Cond]) / np.nansum(massStar[Cond])
                         
-                        
+                    elif 'vtan' in Param:
+                        if 'Gas' in Param or 'SFR' in Param:
+                            pos_use = posGas[Cond]
+                            vel_use = velGas[Cond]
+                            mass_use = massGas[Cond]
+                    
+                        elif 'Star' in Param:
+                            pos_use = posStar[Cond]
+                            vel_use = velStar[Cond]
+                            mass_use = massStar[Cond]
+                    
+                        elif 'DM' in Param:
+                            pos_use = posDM[Cond]
+                            vel_use = velDM[Cond]
+                            mass_use = massDM[Cond]
+                    
+                        ruse = np.linalg.norm(pos_use, axis=1)
+                        jvec = np.cross(pos_use, vel_use)
+                        vtan = np.linalg.norm(jvec, axis=1) / ruse
+                    
+                        good = np.isfinite(vtan) & np.isfinite(mass_use) & (ruse > 0)
+                    
+                        if np.sum(good) < 10:
+                            DFs[l][str(ID)][99 - snap] = -np.inf
+                        else:
+                            DFs[l][str(ID)][99 - snap] = (
+                                np.nansum(mass_use[good] * vtan[good]) / np.nansum(mass_use[good])
+                            )
+                            
                     elif 'j' in Param and not 'jAngle_Gas_Star' in Param:
                         if 'Gas' in Param or 'SFR' in Param:
                             DFs[l][str(ID)][99 - snap] = np.nansum(massGas[Cond]*np.sqrt(np.nansum(np.cross(posGas[Cond], velGas[Cond])*np.cross(posGas[Cond], velGas[Cond]), axis = 1))) / np.nansum(massGas[Cond])
