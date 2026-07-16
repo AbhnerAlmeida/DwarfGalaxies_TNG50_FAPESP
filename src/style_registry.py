@@ -394,6 +394,9 @@ BASE_lines = {
         'StellarMassExSituMajor': 'solid',
         
         
+        'SubhaloSFR': 'solid',
+        'SubhaloSFRE': (0, (10, 8)),
+        
         'GasMass_In_TrueRhpkpc': 'solid',
         'GasMass_Above_TrueRhpkpc': (0, (10, 8)),
         'sSFR_In_TrueRhpkpc': 'solid',
@@ -422,6 +425,12 @@ BASE_scales = {
     'MDM_Norm_Max_99': 'log',
     
     'DMFrac_Birth': 'logit',
+    
+    'RadEx': 'log',
+    'RadIn': 'log',
+
+    'vrot_InSitu_component': 'log',
+    'sigma_InSitu': 'log',
 
     #ExSitu
     'MassExNormalize':  'log',
@@ -464,7 +473,9 @@ BASE_linesthicker = {
         'Type1': 1.5,
         'Type4': 1.1,
         
-        
+        'SubhalosSFR': 1.1,
+       'SubhaloSFRE': 1.1,
+       
         'GasMass_In_TrueRhpkpc': 0.8,
         'GasMass_Above_TrueRhpkpc': 0.8,
         'sSFR_In_TrueRhpkpc': 0.8,
@@ -661,6 +672,9 @@ BASE_titles = {
     'Type1': 'DM',
     'Type4': 'Stars',
     
+    'SubhalosSFR': r'$\mathrm{sSFR}$' ,
+    'SubhaloSFRE': r'$\mathrm{SFE}$' ,
+    
 
 }
 
@@ -716,6 +730,9 @@ labelsequal = {
     
     'SubhalosSFR': r'$\log(\mathrm{sSFR}/\mathrm{yr}^{-1})$',
 
+
+    'SubhaloSFRE': r'$\log(\mathrm{normalized \; SFR}/\mathrm{yr}^{-1})$',
+    
     #ExSitu
     'MassExNormalize': r'Normalized $M_\mathrm{ex-situ}$',
     'MassExNormalizeAll': r'Normalized $M_\mathrm{ex-situ}$',
@@ -837,6 +854,9 @@ labels = {
     'GasMass_Above_TrueRhpkpc':  r'$\log(M_{\mathrm{gas}}/\mathrm{M_\odot})$',
     
     'DMFrac_Birth': r'$(M_\mathrm{DM}/M)_\mathrm{birth}$',
+    
+    'vrot_InSitu_component': r"$\langle v_{\rm rot}\rangle [{\rm km\,s^{-1}}]$",
+    'sigma_InSitu':r"$\sigma_{ v}\ [{\rm km\,s^{-1}}]$",
 
     
     #SFR
@@ -981,6 +1001,9 @@ texts = {
     #SFR
     'SubhalosSFRInHalfRad': r'$\mathrm{sSFR}_{r < r_{1/2}}$',
     'sSFRCoreRatio': r'$\mathrm{sSFR}_{r < r_{1/2}} / \mathrm{sSFR}_{r > r_{1/2}}$',
+    
+    'SubhalosSFR': r'$\mathrm{sSFR}$' ,
+    'SubhaloSFRE': r'$\mathrm{SFE}$' ,
 
     #ExSitu
     'MassExNormalize': r'(M_{\star, \mathrm{ex-situ}} / M_{\star, \mathrm{ex-situ}, z = 0})',

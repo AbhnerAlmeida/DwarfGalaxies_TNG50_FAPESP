@@ -19,6 +19,14 @@ from scipy.stats import ranksums
 from scipy.stats import median_test
 from scipy.stats import kstest
 
+from scipy.stats import (
+    mannwhitneyu,
+    ranksums,
+    fligner,
+    median_abs_deviation,
+)
+
+
 sys.path.append(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/analyzes/GaryScripts")
 import ExtractTNG
 
@@ -135,6 +143,283 @@ def TestPermutation(population_1, population_2, num_permutations = 50000, roundm
     
     return observed_statistic, p_value
 
+################################################################################
+
+
+
+def TestLocationScatter(
+    population_1,
+    population_2,
+    label_1="Population 1",
+    label_2="Population 2",
+    LocationTest="MannWhitney",
+    alternative="two-sided",
+    roundmedian=3,
+    verbose=True,
+):
+    """
+    Compare the location and scatter of two independent distributions.
+
+    Location
+    --------
+    Mann-Whitney U or Wilcoxon rank-sum test.
+
+    Scatter
+    -------
+    Fligner-Killeen test centered on the median.
+
+    Parameters
+    ----------
+    alternative : {"two-sided", "greater", "less"}
+        Refers to population_1 relative to population_2.
+
+        "greater":
+            population_1 tends to have larger values.
+
+        "less":
+            population_1 tends to have smaller values.
+
+        "two-sided":
+            the two distributions differ without assuming direction.
+    """
+
+    population_1 = np.asarray(
+        population_1,
+        dtype=float,
+    ).ravel()
+
+    population_2 = np.asarray(
+        population_2,
+        dtype=float,
+    ).ravel()
+
+    population_1 = population_1[
+        np.isfinite(population_1)
+    ]
+
+    population_2 = population_2[
+        np.isfinite(population_2)
+    ]
+
+    n1 = len(population_1)
+    n2 = len(population_2)
+
+    if n1 < 2 or n2 < 2:
+        raise ValueError(
+            "Both populations must contain at least two "
+            "finite measurements."
+        )
+
+    median_1 = np.nanmedian(population_1)
+    median_2 = np.nanmedian(population_2)
+
+    delta_median = median_1 - median_2
+
+    # Robust measures of scatter.
+    mad_1 = median_abs_deviation(
+        population_1,
+        scale="normal",
+    )
+
+    mad_2 = median_abs_deviation(
+        population_2,
+        scale="normal",
+    )
+
+    iqr_1 = (
+        np.nanpercentile(population_1, 75)
+        - np.nanpercentile(population_1, 25)
+    )
+
+    iqr_2 = (
+        np.nanpercentile(population_2, 75)
+        - np.nanpercentile(population_2, 25)
+    )
+
+    # --------------------------------------------------------
+    # Location test
+    # --------------------------------------------------------
+    location_test = LocationTest.lower()
+
+    if location_test in (
+        "mannwhitney",
+        "mann-whitney",
+        "mannwhitneyu",
+    ):
+        try:
+            location_result = mannwhitneyu(
+                population_1,
+                population_2,
+                alternative=alternative,
+                method="auto",
+            )
+
+        # Compatibility with older SciPy versions.
+        except TypeError:
+            location_result = mannwhitneyu(
+                population_1,
+                population_2,
+                alternative=alternative,
+            )
+
+        location_name = "Mann-Whitney U"
+        location_statistic = location_result.statistic
+        p_location = location_result.pvalue
+
+        # Common-language effect size:
+        # probability that a random value from population 1
+        # is larger than one from population 2, with half weight
+        # assigned to ties.
+        probability_superiority = (
+            location_statistic / (n1 * n2)
+        )
+
+        rank_biserial = (
+            2.0 * probability_superiority - 1.0
+        )
+
+    elif location_test in (
+        "ranksums",
+        "rank-sum",
+        "wilcoxon",
+    ):
+        location_result = ranksums(
+            population_1,
+            population_2,
+            alternative=alternative,
+        )
+
+        location_name = "Wilcoxon rank-sum"
+        location_statistic = location_result.statistic
+        p_location = location_result.pvalue
+
+        probability_superiority = np.nan
+        rank_biserial = np.nan
+
+    else:
+        raise ValueError(
+            "LocationTest must be 'MannWhitney' or 'RankSums'."
+        )
+
+    # --------------------------------------------------------
+    # Scatter test
+    # --------------------------------------------------------
+    scatter_result = fligner(
+        population_1,
+        population_2,
+        center="median",
+    )
+
+    fligner_statistic = scatter_result.statistic
+    p_scatter = scatter_result.pvalue
+
+    if np.isclose(mad_1, mad_2):
+        larger_scatter = "similar"
+    elif mad_1 > mad_2:
+        larger_scatter = label_1
+    else:
+        larger_scatter = label_2
+
+    result = {
+        "label_1": label_1,
+        "label_2": label_2,
+
+        "N_1": n1,
+        "N_2": n2,
+
+        "median_1": median_1,
+        "median_2": median_2,
+        "delta_median_1_minus_2": delta_median,
+
+        "MAD_1": mad_1,
+        "MAD_2": mad_2,
+        "IQR_1": iqr_1,
+        "IQR_2": iqr_2,
+
+        "location_test": location_name,
+        "alternative": alternative,
+        "location_statistic": location_statistic,
+        "p_location": p_location,
+
+        "probability_superiority_1_over_2": (
+            probability_superiority
+        ),
+        "rank_biserial": rank_biserial,
+
+        "fligner_statistic": fligner_statistic,
+        "p_scatter": p_scatter,
+        "larger_scatter_by_MAD": larger_scatter,
+    }
+
+    if verbose:
+        print(
+            "\n",
+            label_1,
+            " versus ",
+            label_2,
+            sep="",
+        )
+
+        print("N:", n1, n2)
+
+        print(
+            "Medians:",
+            round(median_1, roundmedian),
+            round(median_2, roundmedian),
+        )
+
+        print(
+            "Median difference (1 - 2):",
+            round(delta_median, roundmedian),
+        )
+
+        print(
+            "MAD:",
+            round(mad_1, roundmedian),
+            round(mad_2, roundmedian),
+        )
+
+        print(
+            "IQR:",
+            round(iqr_1, roundmedian),
+            round(iqr_2, roundmedian),
+        )
+
+        print(
+            f"{location_name}:",
+            round(location_statistic, 5),
+            "p =",
+            f"{p_location:.5g}",
+            f"({alternative})",
+        )
+
+        if np.isfinite(probability_superiority):
+            print(
+                "Probability superiority P(X1 > X2):",
+                round(probability_superiority, 4),
+            )
+
+            print(
+                "Rank-biserial correlation:",
+                round(rank_biserial, 4),
+            )
+
+        print(
+            "Fligner-Killeen:",
+            round(fligner_statistic, 5),
+            "p =",
+            f"{p_scatter:.5g}",
+        )
+
+        print(
+            "Larger robust scatter:",
+            larger_scatter,
+        )
+
+    return result
+
+
+#################################################################################
 def median(data, Nboots = 1000):
 
     snaps = [ str(int(i)) for i in np.arange(data.shape[1]-1)]

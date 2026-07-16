@@ -88,8 +88,12 @@ plt.style.use(os.getenv("HOME")+"/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/src/a
 
 #Paths
 SaveSubhaloPath = os.getenv("HOME")+'/TNG_Analyzes/SubhaloHistory/'
+
 SIMTNG = 'TNG50'
 Nsim = '-1'
+MAIN_SAVE_FIG = os.getenv("HOME")+'/TNG_Analyzes/Figs/' + SIMTNG + '/'
+
+
 dfTime = pd.read_csv(os.getenv("HOME")+'/PROJECTS/2026/DwarfGalaxies_TNG50_FAPESP/utils/SNAPS_TIME.csv')
 
 
@@ -944,7 +948,9 @@ def PlotMedianEvolution(
                             # thresholds
                             if "sSFR" in str(paramname):
                                 values[values <= -14] = np.nan
-                            elif "SFR" in str(paramname):
+                            elif "SFRE" in str(paramname):
+                                values[values <= -11.5] = np.nan
+                            elif "SFR" in str(paramname) and not 'SFRE' in str(paramname):
                                 values[values <= -4] = np.nan
                             # Legacy: if phasing plot + “LoseTheir” gas case: cut after first NaN
                             if PhasingPlot:
@@ -1133,7 +1139,7 @@ def PlotMedianEvolution(
             # Rightmost column text
             if j == len(columns) - 1:
                 if Text is not None and (p_for_scale not in ["SubhalosSFRInHalfRad", "SubhalosSFRwithinHalfandRad", "SubhalosSFRwithinRadandAll"]):
-                    _make_anchored_text(ax, Text[i] if i < len(Text) else None, "lower left")
+                    _make_anchored_text(ax, Text[i] if i < len(Text) else None, "upper left")
 
                 if xlabelintext and (not limaxis) and len(rows) > 1:
                     _make_anchored_text(ax, texts.get(p_for_scale, p_for_scale), "upper right")
@@ -1172,6 +1178,8 @@ def PlotMedianEvolution(
             # Bottom row x-axis formatting
             if i == len(rows) - 1:
                 if Type == "Evolution":
+                    
+
                     if LookBackTime and (not PhasingPlot and not PhasingMedianLine):
                         if JustOneXlabel:
                             if (j == 1):
@@ -1897,8 +1905,7 @@ def PlotScatter(
         Place ALL your special-case quadrant fills / guide lines / custom ticks here.
         """
         # --- Special rules (subset copied from your original) ---
-        
-
+    
         if (ParamX == "MassIn_Infall_to_GasLost") and (ParamsY[0] == "MassAboveAfter_Infall_to_GasLost"):
             x = np.linspace(0, 1)
             y = -x
@@ -1919,6 +1926,12 @@ def PlotScatter(
             xfitline  = np.linspace(0 ,1, 100)
             axs[i][j].plot( xfitline, xfitline, ls='--', color='tab:blue', linewidth=linewidth)
             axs[i][j].plot( xfitline, np.zeros(100), ls='--', color='k', linewidth=linewidth, zorder = 1)
+
+
+        elif (ParamX[0] == 'RadEx' and  (ParamsY[0] == 'RadIn')) :
+            xfitline  = np.linspace(0.7 , 25, 100)
+            axs[i][j].plot( xfitline, xfitline, ls='--', color='gray', linewidth=linewidth)
+
 
         elif (ParamX == 'Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry' and  (ParamsY[0] == 'Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry')) :
 
@@ -2386,8 +2399,11 @@ def PlotScatter(
                         ax.set_xscale('symlog',linthresh=0.02)
                         ax.set_xticks([ 0, 0.01, 0.1, 1, 10])
                         ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
-
-                    if xscale == None and "log" in scales(ParamsX[0]) and not ParamsX[j] == 'z_Birth':
+                     
+                    if len(ParamsX) > 1 and xscale == None and "log" in scales(ParamsX[0]) and not ParamsX[j] == 'z_Birth':
+                        ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+                        
+                    elif xscale == None and "log" in scales(ParamsX[0]):
                         ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
                         
                 ax.tick_params(axis="x", labelsize=0.99 * fontlabel)
@@ -2874,8 +2890,8 @@ def PlotScatterJoint(
             2, 2,
             width_ratios=[4.0, 1.15],
             height_ratios=[1.15, 4.0],
-            hspace=0.04,
-            wspace=0.04,
+            hspace=0.0,
+            wspace=0.0,
         )
 
         ax = fig.add_subplot(gs[1, 0])
@@ -3095,10 +3111,14 @@ def PlotScatterJoint(
                 )
 
         # Cleaner marginal axes
-        ax_histx.spines["right"].set_visible(False)
-        ax_histx.spines["top"].set_visible(False)
-        ax_histy.spines["right"].set_visible(False)
-        ax_histy.spines["top"].set_visible(False)
+        for marginal_ax in (ax_histx, ax_histy):
+            for spine in marginal_ax.spines.values():
+                spine.set_visible(True)
+                spine.set_linestyle("-")
+                spine.set_edgecolor("black")
+                spine.set_linewidth(
+                    ax.spines["left"].get_linewidth()
+                )
 
         stats = _make_stats(class_data)
 
@@ -3171,7 +3191,7 @@ def PlotScatterJoint(
                         )
 
                     fig.savefig(
-                        os.path.join(savepath, fname),
+                        os.path.join(MAIN_SAVE_FIG+savepath, fname),
                         bbox_inches="tight",
                         dpi=dpi,
                         transparent=TRANSPARENT,
@@ -4334,7 +4354,1650 @@ def PlotIDsAllTogether(
 
     return
 
+def PlotScatterColumn(
+    # --- Data / what to plot ---
+    names, columns, ParamX, ParamsY, Type="z0", snap=(99,), ColumnPlot=True,
+    dfName="Sample", SampleName="Samples", Name="Name",
 
+    # --- Extra layers ---
+    All=None, COLORBAR=None, MarkerSizes=None, NoneEdgeColor=False,
+    BackGroudnDensity=None,
+
+    # --- Statistics ---
+    medianBins=False, medianAll=False, medianDotStar=False,
+    medianDot=False, SpearManTest=False, SpearManTestAll=False,
+    bins=10, quantile=0.95, q=0.95, HIGHLIGHTPoints=False,
+
+    # --- Layout ---
+    lNum=6, cNum=6, xscale=None, yscales=None, GridMake=False,
+    InvertPlot=False, xlabelintext=False, title=False,
+
+    # --- Helper lines ---
+    EqualLine=False, EqualLineMin=None, EqualLineMax=None,
+
+    # --- Limits ---
+    xlimmin=None, xlimmax=None, ylimmin=None, ylimmax=None,
+    xlims=None, ylims=None,
+
+    # --- Style ---
+    cmap="inferno", m="o", msizet=30, msizetstar=30, msizeMult=1,
+    alphaScater=1.0, alphaShade=0.3, linewidth=1.2, fontlabel=26,
+    framealpha=0.95,
+
+    # --- Legend ---
+    legend=False, LegendNames=None, legpositions=None, loc="best",
+    columnspacing=0.5, handlelength=2, handletextpad=-0.5,
+    labelspacing=0.3,
+
+    # --- Colorbar ---
+    ratioColorbar=None, mult=4.1,
+
+    # --- IO ---
+    savepath="fig/PlotScatter", savefigname="fig", TRANSPARENT=False,
+
+    # --- Reproducibility ---
+    seed=16010504,
+):
+    """
+    Scatter-plot grid for X--Y relations across samples/snapshots and
+    multiple Y parameters.
+
+    Panel orientation
+    -----------------
+    ColumnPlot=True (original orientation):
+        rows    -> ParamsY
+        columns -> columns / snapshots
+
+    ColumnPlot=False (transposed orientation):
+        rows    -> columns / snapshots
+        columns -> ParamsY
+
+    Notes
+    -----
+    The arrays returned by ``TNG.makedata`` are not transposed. They remain
+    indexed as::
+
+        data[y_parameter_index][column_index][population_index]
+
+    Only the mapping between data indices and visual panel indices changes.
+
+    ``BackGroudnDensity`` accepts either one pair ``[x_background,
+    y_background]`` reused for every Y parameter, or one pair per Y
+    parameter. The spelling is intentionally preserved for compatibility
+    with existing calls.
+
+    ``xlims`` and ``ylims`` may be one ``[min, max]`` pair or one pair per
+    entry of ``columns`` / snapshot panel.
+
+    Author: Abhner P. de Almeida (abhner.almeida AAT usp.br)
+    """
+
+    np.random.seed(seed)
+
+    # ------------------------------------------------------------------
+    # Helpers: normalization / indexing
+    # ------------------------------------------------------------------
+    def _as_list(value):
+        if isinstance(value, (list, tuple, np.ndarray)):
+            return list(value)
+        return [value]
+
+    def _normalize_inputs(columns_, ParamX_, ParamsY_):
+        cols = _as_list(columns_)
+        ys = _as_list(ParamsY_)
+
+        if isinstance(ParamX_, (list, tuple, np.ndarray)):
+            xs = list(ParamX_)
+            label_general_ = True
+        else:
+            xs = [ParamX_] * len(ys)
+            label_general_ = False
+
+        if len(xs) != len(ys):
+            raise ValueError(
+                "ParamX must be a scalar or have the same length as ParamsY."
+            )
+
+        return cols, xs, ys, label_general_
+
+    def _value_for_y(value, y_idx, name_="value"):
+        """Return a scalar option or the option corresponding to ParamsY[y_idx]."""
+        if value is None:
+            return None
+
+        if isinstance(value, str) or np.isscalar(value):
+            return value
+
+        values = list(value)
+        if len(values) == 0:
+            return None
+        if len(values) == 1:
+            return values[0]
+        if y_idx >= len(values):
+            raise IndexError(
+                f"{name_} has {len(values)} values, but ParamsY requires "
+                f"an entry at index {y_idx}."
+            )
+        return values[y_idx]
+
+    def _value_for_index(value, idx, default=None):
+        """Read a scalar or sequence option without indexing strings by character."""
+        if value is None:
+            return default
+        if isinstance(value, str) or np.isscalar(value):
+            return value
+
+        values = list(value)
+        if len(values) == 0:
+            return default
+        if len(values) == 1:
+            return values[0]
+        if idx < len(values):
+            return values[idx]
+        return default
+
+    def _panel_indices(panel_i, panel_j):
+        """Map a visual panel position to data indices."""
+        if ColumnPlot:
+            y_idx_ = panel_i
+            column_idx_ = panel_j
+        else:
+            y_idx_ = panel_j
+            column_idx_ = panel_i
+        return y_idx_, column_idx_
+
+    def _format_with(function_, key):
+        """Use a project formatter when possible, otherwise return the raw key."""
+        try:
+            return function_(key)
+        except Exception:
+            return str(key)
+
+    def _label_from(mapping, key):
+        try:
+            return mapping.get(key, key)
+        except Exception:
+            return str(key)
+
+    def _single_value_equals(value, expected):
+        if value is None:
+            return False
+        if isinstance(value, str) or np.isscalar(value):
+            return value == expected
+        values = list(value)
+        return len(values) == 1 and values[0] == expected
+
+    def _normalize_background_density(value, n_yparams):
+        """
+        Normalize the optional density variables.
+
+        Accepted forms
+        --------------
+        [x_background, y_background]
+            One pair reused for every Y parameter.
+
+        [[x_background_0, y_background_0], ...]
+            One pair for each entry of ParamsY.
+        """
+        if value is None:
+            return None, None
+
+        values = list(value)
+
+        if (
+            len(values) == 2
+            and all(isinstance(item, str) for item in values)
+        ):
+            return (
+                [values[0]] * n_yparams,
+                [values[1]] * n_yparams,
+            )
+
+        if (
+            len(values) == n_yparams
+            and all(
+                isinstance(item, (list, tuple, np.ndarray))
+                and len(item) == 2
+                for item in values
+            )
+        ):
+            return (
+                [item[0] for item in values],
+                [item[1] for item in values],
+            )
+
+        raise ValueError(
+            "BackGroudnDensity must be [x_background, y_background] "
+            "or one [x_background, y_background] pair per ParamsY entry."
+        )
+
+    def _panel_limit_pair(value, column_idx, n_columns, name_):
+        """
+        Return one [min, max] pair for the current sample/snapshot panel.
+
+        A single pair is reused for every panel. A list of pairs is indexed
+        by the original sample/snapshot dimension, independently of whether
+        the visual layout is transposed.
+        """
+        if value is None:
+            return None
+
+        values = list(value)
+
+        if (
+            len(values) == 2
+            and all(np.isscalar(item) for item in values)
+        ):
+            pair = values
+        elif (
+            len(values) == n_columns
+            and all(
+                isinstance(item, (list, tuple, np.ndarray))
+                and len(item) == 2
+                for item in values
+            )
+        ):
+            pair = values[column_idx]
+        else:
+            raise ValueError(
+                f"{name_} must be [min, max] or contain one [min, max] "
+                f"pair for each of the {n_columns} sample/snapshot panels."
+            )
+
+        lower, upper = float(pair[0]), float(pair[1])
+        if not np.isfinite(lower) or not np.isfinite(upper):
+            raise ValueError(f"{name_} limits must be finite.")
+        if lower >= upper:
+            raise ValueError(
+                f"{name_} lower limit must be smaller than its upper limit."
+            )
+
+        return lower, upper
+
+    # ------------------------------------------------------------------
+    # Helpers: data loading
+    # ------------------------------------------------------------------
+    def _load_data(names_, columns_, ParamsX_, ParamsY_):
+        """
+        Load the arrays while preserving the original TNG.makedata layout.
+
+        Returns
+        -------
+        data_columns, dataX, dataY, dataColor, dataMarker
+        """
+        if columns_ == ["Snap"]:
+            data_columns = list(snap)
+
+            dataX_ = TNG.makedata(
+                names_, data_columns, ParamsX_, "Snap",
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+            dataY_ = TNG.makedata(
+                names_, data_columns, ParamsY_, "Snap",
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+
+            dataColor_ = None
+            dataMarker_ = None
+
+            if COLORBAR is not None:
+                dataColor_ = TNG.makedata(
+                    names_, data_columns, COLORBAR, "Snap",
+                    snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+                )
+
+            if MarkerSizes is not None:
+                dataMarker_ = TNG.makedata(
+                    names_, data_columns, MarkerSizes, "Snap",
+                    snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+                )
+
+            return data_columns, dataX_, dataY_, dataColor_, dataMarker_
+
+        data_columns = list(columns_)
+
+        dataX_ = TNG.makedata(
+            names_, data_columns, ParamsX_, Type,
+            snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+        )
+        dataY_ = TNG.makedata(
+            names_, data_columns, ParamsY_, Type,
+            snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+        )
+
+        dataColor_ = None
+        dataMarker_ = None
+
+        if MarkerSizes is not None:
+            dataMarker_ = TNG.makedata(
+                names_, data_columns, MarkerSizes, Type,
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+
+        if COLORBAR is not None:
+            dataColor_ = TNG.makedata(
+                names_, data_columns, COLORBAR, Type,
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+
+        return data_columns, dataX_, dataY_, dataColor_, dataMarker_
+
+    def _load_background_density(
+        names_, data_columns_, background_x_, background_y_
+    ):
+        """Load optional X/Y arrays used only by the KDE background."""
+        if background_x_ is None or background_y_ is None:
+            return None, None
+
+        if columns == ["Snap"]:
+            dataBackgroundX_ = TNG.makedata(
+                names_, data_columns_, background_x_, "Snap",
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+            dataBackgroundY_ = TNG.makedata(
+                names_, data_columns_, background_y_, "Snap",
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+        else:
+            dataBackgroundX_ = TNG.makedata(
+                names_, data_columns_, background_x_, Type,
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+            dataBackgroundY_ = TNG.makedata(
+                names_, data_columns_, background_y_, Type,
+                snap=snap, SampleName=SampleName, dfName=dfName, Name=Name,
+            )
+
+        return dataBackgroundX_, dataBackgroundY_
+
+    def _auxiliary_panel(data, y_idx, column_idx, auxiliary_name):
+        """
+        Select one COLORBAR/MarkerSizes panel.
+
+        A single auxiliary parameter is reused for all ParamsY. When the
+        auxiliary array has one parameter per ParamsY, y_idx is used.
+        """
+        if data is None:
+            return None
+
+        n_auxiliary_parameters = len(data)
+        if n_auxiliary_parameters == 0:
+            raise ValueError(f"{auxiliary_name} returned an empty data array.")
+
+        auxiliary_idx = y_idx if n_auxiliary_parameters == len(ParamsY) else 0
+        return data[auxiliary_idx][column_idx]
+
+    # ------------------------------------------------------------------
+    # Helpers: axes and labels
+    # ------------------------------------------------------------------
+    def _setup_axes(nrows, ncols):
+        plt.rcParams.update({
+            "figure.figsize": (cNum * ncols, lNum * nrows),
+        })
+
+        fig_ = plt.figure()
+        gs = fig_.add_gridspec(nrows, ncols, hspace=0, wspace=0)
+
+        # In the original orientation, each row contains one Y parameter,
+        # so sharing Y within the row is appropriate. In the transposed
+        # orientation, keep the Y axes independent so that every physical row
+        # preserves its tick labels and ylabel, as in vertically stacked
+        # panels such as Centrals / Sats loEnv / Sats hiEnv.
+        share_y = "row" if ColumnPlot else False
+
+        # When ParamX differs between ParamsY, sharing x in the original
+        # orientation would incorrectly force distinct quantities to use the
+        # same scale. In the transposed orientation each visual column has one
+        # ParamsX, so sharing along columns is appropriate.
+        if ColumnPlot and len(set(ParamsX)) > 1:
+            share_x = False
+        elif not ColumnPlot and xlims is not None:
+            # In the transposed layout, each original sample/snapshot panel
+            # occupies a different visual row. Explicit per-panel x limits
+            # therefore cannot share one X axis down the visual column.
+            share_x = False
+        else:
+            share_x = "col"
+
+        axs_ = gs.subplots(
+            sharex=share_x,
+            sharey=share_y,
+            squeeze=False,
+        )
+        return fig_, axs_
+
+    def _panel_column_label(column_idx):
+        """Label associated with the sample/snapshot dimension."""
+        if panel_columns[column_idx] == "Snap":
+            snap_value = data_columns[column_idx]
+            values = dfTime.z.loc[dfTime.Snap == snap_value].values
+            if len(values) > 0:
+                return r"$z = %.1f$" % values[0]
+            return f"Snap {snap_value}"
+
+        if title:
+            # ``title`` may be True (use the column name itself), a scalar
+            # title key, or one title key per sample/snapshot.
+            if isinstance(title, (bool, np.bool_)):
+                title_key = panel_columns[column_idx]
+            else:
+                title_key = _value_for_index(
+                    title,
+                    column_idx,
+                    panel_columns[column_idx],
+                )
+            return _format_with(titles, title_key)
+
+        return _format_with(titles, panel_columns[column_idx])
+
+    def _y_parameter_label(yparam):
+        if label_general:
+            return _label_from(labelsequal, yparam)
+        return _label_from(labels, yparam)
+
+    def _x_parameter_label(xparam):
+        if label_general:
+            return _label_from(labelsequal, xparam)
+        return _label_from(labels, xparam)
+
+    def _add_panel_title_text(ax, text_):
+        """Place the sample/snapshot title inside the panel, upper left."""
+        if text_ is None:
+            return
+
+        title_artist = AnchoredText(
+            str(text_),
+            loc="upper left",
+            prop={"color": "black", "size": 0.92 * fontlabel},
+            frameon=True,
+            pad=0.25,
+            borderpad=0.35,
+        )
+        title_artist.patch.set_facecolor("white")
+        title_artist.patch.set_edgecolor("black")
+        title_artist.patch.set_linewidth(0.8 * linewidth)
+        title_artist.patch.set_alpha(framealpha)
+        ax.add_artist(title_artist)
+
+    # ------------------------------------------------------------------
+    # Helpers: special plotting rules
+    # ------------------------------------------------------------------
+    def _apply_special_xaxis_rules(
+        ax, ParamX_, yparam, ylimmin_for_y, fontlabel_
+    ):
+        """Apply the project-specific X/Y tick rules to one panel."""
+        if ParamX_ == "DecreaseBeforeGas":
+            ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+            ax.set_xticklabels(["", "0.2", "0.4", "0.6", "0.8", "1.0"])
+
+        if ParamX_ == "Decrease_Entry_To_NoGas_Norm_Delta":
+            ax.set_xticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
+            ax.set_xticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
+            
+        if ParamX_ == "vrot_InSitu_component":
+            ax.set_xticks([1, 5, 10, 20, 50])
+            ax.set_xticklabels(["1", "5", "10", "20", "50"])
+
+        if "Snap" in str(ParamX_):
+            ax.set_xlim(-0.2, 14.2)
+            ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
+            ax.set_xticklabels(["0", "2", "4", "6", "8", "10", "12", "14"])
+
+        if "DMFrac_Birth" in str(yparam):
+            ax.set_yticks([0.001, 0.01, 0.1, 0.5, 0.9, 0.99])
+            ax.set_yticklabels([
+                "$10^{-3}$", "$10^{-2}$", "0.1", "0.5", "0.9", "0.99",
+            ])
+
+        if ParamX_ == "MassIn_Infall_to_GasLost":
+            ax.set_xticks([-0.15, 0, 0.25, 0.5, 0.75])
+            ax.set_xticklabels(["-0.15", "0", "0.25", "0.50", "0.75"])
+
+        if (
+            "StarFrac" in str(ParamX_)
+            and "GasFrac" in str(yparam)
+            and ylimmin_for_y != 0.001
+        ):
+            ax.tick_params(axis="y", labelsize=0.88 * fontlabel_)
+            ax.tick_params(axis="x", labelsize=0.88 * fontlabel_)
+
+            ax.set_yticks([0.02, 0.03, 0.04, 0.06, 0.08, 0.1])
+            ax.set_yticklabels(["0.02", "0.03", "0.04", "0.06", "0.08", "0.1"])
+            ax.set_xticks([0.004, 0.006, 0.01, 0.02, 0.03])
+            ax.set_xticklabels(["0.004", "0.006", "0.01", "0.02", "0.03"])
+
+    def _apply_special_background_rules(
+        ax, ParamX_, yparam, linewidth_, fontlabel_
+    ):
+        """Apply guide lines, regions, and annotations to one panel."""
+        
+       
+        if (
+            ParamX_ == "MassIn_Infall_to_GasLost"
+            and yparam == "MassAboveAfter_Infall_to_GasLost"
+        ):
+            x = np.linspace(0, 1)
+            ax.plot(x, -x, color="darkorange", linestyle="dashed", lw=linewidth_)
+
+            ax.axvline(0, color="black", linestyle="dashed", lw=linewidth_)
+            ax.axhline(0, color="black", linestyle="dashed", lw=linewidth_)
+
+            ax.fill_between([0, 500], -500, 0, alpha=0.2, color="tab:green")
+            ax.fill_between([-500, 0], -500, 0, alpha=0.2, color="tab:red")
+            ax.fill_between([0, 500], 0, 500, alpha=0.2, color="tab:blue")
+
+            ax.text(-0.145, -0.95, "TS", fontsize=0.98 * fontlabel_)
+            ax.text(0.1, 0.02, "SF", fontsize=0.98 * fontlabel_)
+            ax.text(0.15, -0.95, "Interplay", fontsize=0.98 * fontlabel_)
+
+        elif (
+            ParamX_ == "Relative_logInnerZ_At_Entry"
+            and yparam == "Relative_logZ_At_Entry"
+        ):
+            xfitline = np.linspace(0, 1, 100)
+            ax.plot(
+                xfitline, xfitline, ls="--", color="tab:blue",
+                linewidth=linewidth_,
+            )
+            ax.plot(
+                xfitline, np.zeros(100), ls="--", color="k",
+                linewidth=linewidth_, zorder=1,
+            )
+
+        elif (
+            ParamX_ == "Relative_Rhalf_MaxProfile_Minus_HalfRadstar_Entry"
+            and yparam == "Relative_Rhalf_MinProfile_Minus_HalfRadstar_Entry"
+        ):
+            xfitline = np.linspace(-6, 2, 100)
+            ax.axvline(
+                0, color="black", linestyle="dashed", lw=linewidth_, zorder=1,
+            )
+            ax.plot(
+                xfitline, xfitline, ls="--", color="tab:blue",
+                linewidth=linewidth_, zorder=1,
+            )
+            ax.text(
+                -1.15, -1.58,
+                "Outer stellar profile \n evolution \n dominates",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.text(
+                -1.8, -0.75,
+                "Inner stellar profile \n evolution \n dominates",
+                fontsize=0.99 * fontlabel_,
+            )
+
+        elif (
+            ParamX_ == "sSFRTrueInner_BeforeEntry"
+            and yparam == "sSFRTrueInner_Entry_to_Nogas"
+        ):
+            x = np.linspace(-12, -8)
+            ax.plot(x, x, ls="--", color="tab:blue", linewidth=linewidth_)
+
+            ax.text(
+                -10, -10.55,
+                "Inner $\\overline{\\mathrm{sSFR}}$ \n decrease",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.text(
+                -10.9, -9.5,
+                "Inner $\\overline{\\mathrm{sSFR}}$ \n increase",
+                fontsize=0.99 * fontlabel_,
+            )
+
+        elif (
+            ParamX_ == "Decrease_Entry_To_NoGas_Norm_Delta"
+            and yparam == "Decrease_NoGas_To_Final_Norm_Delta"
+        ):
+            ax.text(
+                -0.6, -0.8,
+                "Faster compaction \n after gas loss",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.text(
+                -0.80, -0.25,
+                "Faster compaction  \n with gas ",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.axvline(0, color="black", linestyle="dashed", lw=linewidth_)
+            ax.axhline(0, color="black", linestyle="dashed", lw=linewidth_)
+            ax.set_xticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
+            ax.set_xticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
+            ax.set_yticks([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2])
+            ax.set_yticklabels(["-0.8", "-0.6", "-0.4", "-0.2", "0.0", "0.2"])
+
+        elif (
+            ParamX_ == "global_color_U_minus_r_1xRh"
+            and yparam == "ratio_color_U_minus_r_1xRh"
+        ):
+            xfitline = np.linspace(-0.75, 2.5, 100)
+            ax.fill_between(xfitline, -1.5, 0, alpha=0.1, color="tab:blue")
+            ax.axvline(0, color="black", linestyle="dashed", lw=linewidth_)
+            ax.axhline(0, color="black", linestyle="dashed", lw=linewidth_)
+
+        elif (
+            ParamX_ == "Decrease_Entry_To_NoGas"
+            and yparam == "Decrease_NoGas_To_Final"
+        ):
+            ax.text(
+                -0.55, -1.3,
+                "Larger compaction \n after gas loss",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.text(
+                -1.2, 0.2,
+                "Larger compaction  \n with gas ",
+                fontsize=0.99 * fontlabel_,
+            )
+            ax.axvline(
+                0, color="black", linestyle="dashed", lw=linewidth_, zorder=1,
+            )
+            ax.axhline(
+                0, color="black", linestyle="dashed", lw=linewidth_, zorder=1,
+            )
+
+        elif (
+            ParamX_ == "Rhalf_MaxProfile_Minus_HalfRadstar_Entry"
+            and yparam == "Rhalf_MinProfile_Minus_HalfRadstar_Entry"
+        ):
+            xfitline = np.linspace(-6, 2, 100)
+            ax.plot(
+                xfitline, xfitline, ls="--", color="tab:blue",
+                linewidth=linewidth_,
+            )
+            ax.fill_between(
+                xfitline, -7, xfitline, alpha=0.2, color="tab:blue",
+            )
+            ax.text(-2, -5, "TS", fontsize=0.99 * fontlabel_)
+            ax.fill_between(
+                xfitline, xfitline, 1, alpha=0.2, color="tab:red",
+            )
+            ax.text(-4.0, -1, "SF", fontsize=0.99 * fontlabel_)
+
+        elif "StarFrac" in str(ParamX_) and "GasFrac" in str(yparam):
+            x = np.linspace(0, 1)
+            ax.plot(
+                x, x, ls="--", color="gray", linewidth=linewidth_, zorder=0,
+            )
+            
+        elif "vrot_InSitu_component" in str(ParamX_) and "sigma_InSitu" in str(yparam):
+            x = np.linspace(0, 100)
+            ax.plot(
+                x, x, ls="--", color="gray", linewidth=linewidth_, zorder=0,
+            )
+
+        elif "StarFrac" in str(ParamX_) and "DMFrac" in str(yparam):
+            x = np.linspace(0, 1)
+            ax.plot(
+                x, 1 - x, ls="dotted", color="gray",
+                linewidth=linewidth_, zorder=0,
+            )
+
+        elif "RadEx" in str(ParamX_) and "RadIn" in str(yparam):
+            
+            x = np.linspace(0, 50)
+            ax.plot(
+                x, x, ls="dotted", color="gray",
+                linewidth=linewidth_, zorder=0,
+            )
+            
+        elif "z_Birth" in str(ParamX_) and "DMFrac_Birth" in str(yparam):
+            ax.axhline(0.8, ls="--", color="tab:red", linewidth=linewidth_)
+
+        if ParamX_ == "AgeBorn":
+            x = np.arange(14)
+            ax.plot(x, x, color="black", linestyle="dashed", lw=2)
+
+    # ------------------------------------------------------------------
+    # Helpers: density / scatter / scales / colorbar
+    # ------------------------------------------------------------------
+    def _density_transform(values, scale_name):
+        values = np.asarray(values, dtype=float)
+
+        if scale_name == "log":
+            return np.log10(values)
+
+        # For linear and symlog axes, KDE is evaluated in the original
+        # coordinates. This preserves all finite values for symlog panels.
+        return values
+
+    def _density_inverse(values, scale_name):
+        if scale_name == "log":
+            return 10.0 ** values
+        return values
+
+    def _density_bounds(values, scale_name, explicit_limits=None):
+        """Bounds in KDE coordinates, using explicit panel limits if given."""
+        if explicit_limits is not None:
+            lower, upper = explicit_limits
+            if scale_name == "log":
+                if lower <= 0 or upper <= 0:
+                    raise ValueError(
+                        "Logarithmic density panels require positive limits."
+                    )
+                return np.log10(lower), np.log10(upper)
+            return lower, upper
+
+        transformed = _density_transform(values, scale_name)
+        finite = transformed[np.isfinite(transformed)]
+        if len(finite) == 0:
+            return None
+
+        lower, upper = np.nanpercentile(finite, [1.0, 99.0])
+        width = upper - lower
+
+        if not np.isfinite(width) or width <= 0:
+            width = max(abs(lower), 1.0) * 0.10
+
+        return lower - 0.08 * width, upper + 0.08 * width
+
+    def _add_background_density(
+        ax,
+        x,
+        y,
+        color,
+        xscale_name,
+        yscale_name,
+        xlim_pair=None,
+        ylim_pair=None,
+    ):
+        """
+        Draw a population KDE behind the foreground scatter.
+
+        KDE is evaluated in log10 coordinates whenever the corresponding
+        plotted axis is logarithmic. This prevents a density map on log axes
+        from being biased by a grid uniform in linear coordinates.
+        """
+        from scipy.stats import gaussian_kde
+
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+
+        if x.shape != y.shape:
+            raise ValueError(
+                "BackGroudnDensity X and Y arrays must have the same shape."
+            )
+
+        good = np.isfinite(x) & np.isfinite(y)
+        if xscale_name == "log":
+            good &= x > 0
+        if yscale_name == "log":
+            good &= y > 0
+
+        x = x[good]
+        y = y[good]
+
+        if len(x) < 10:
+            return
+
+        tx = _density_transform(x, xscale_name)
+        ty = _density_transform(y, yscale_name)
+
+        try:
+            kde = gaussian_kde(np.vstack([tx, ty]))
+        except Exception:
+            # Singular covariance matrices can occur for very small or
+            # nearly collinear samples. In that case the density layer is
+            # skipped without affecting the scatter panel.
+            return
+
+        tx_bounds = _density_bounds(
+            x,
+            xscale_name,
+            explicit_limits=xlim_pair,
+        )
+        ty_bounds = _density_bounds(
+            y,
+            yscale_name,
+            explicit_limits=ylim_pair,
+        )
+
+        if tx_bounds is None or ty_bounds is None:
+            return
+
+        tx_grid = np.linspace(tx_bounds[0], tx_bounds[1], 160)
+        ty_grid = np.linspace(ty_bounds[0], ty_bounds[1], 160)
+        txx, tyy = np.meshgrid(tx_grid, ty_grid)
+
+        density = kde(
+            np.vstack([txx.ravel(), tyy.ravel()])
+        ).reshape(txx.shape)
+
+        if not np.isfinite(density).any():
+            return
+
+        density_max = np.nanmax(density)
+        if not np.isfinite(density_max) or density_max <= 0:
+            return
+
+        density = density / density_max
+        levels = np.linspace(0.20, 1.0, 5)
+
+        xx = _density_inverse(txx, xscale_name)
+        yy = _density_inverse(tyy, yscale_name)
+
+        ax.contourf(
+            xx,
+            yy,
+            density,
+            levels=levels,
+            colors=[color],
+            alpha=alphaShade,
+            antialiased=True,
+            zorder=-10,
+        )
+
+        ax.contour(
+            xx,
+            yy,
+            density,
+            levels=levels,
+            colors=[color],
+            linewidths=0.5 * linewidth,
+            alpha=min(1.0, alphaShade + 0.30),
+            zorder=-9,
+        )
+        
+        
+
+    def _scatter_one(ax, x, y, name_, color_values=None, marker_flags=None):
+        """Scatter one population in one panel."""
+        if NoneEdgeColor:
+            edcolor = None
+        else:
+            edcolor = "black"
+
+        if marker_flags is not None:
+            Markers = np.asarray(marker_flags)
+
+            ax.scatter(
+                x[Markers <= 1], y[Markers <= 1],
+                color=colors(name_), edgecolor=edgecolors(name_),
+                alpha=alphaScater, lw=linesthicker(name_),
+                marker=markers(name_), s=20,
+            )
+            ax.scatter(
+                x[Markers == 2], y[Markers == 2],
+                color=colors(name_), edgecolor=edgecolors(name_),
+                alpha=alphaScater, lw=linesthicker(name_),
+                marker=markers(name_), s=45,
+            )
+            ax.scatter(
+                x[Markers >= 3], y[Markers >= 3],
+                color=colors(name_), edgecolor=edgecolors(name_),
+                alpha=alphaScater, lw=linesthicker(name_),
+                marker=markers(name_), s=120,
+            )
+            return None, None
+
+        if color_values is not None:
+            sc_local, norm_local = _scatter_with_colorbar(
+                ax=ax,
+                x=x,
+                y=y,
+                color_values=color_values,
+                colorbar_key=COLORBAR[0],
+                names_l=name_,
+                cmap_name=cmap,
+                alpha_scatter=alphaScater,
+                linewidth=linewidth,
+                msizet=msizet,
+                HIGHLIGHTPoints=HIGHLIGHTPoints,
+            )
+            return sc_local, norm_local
+
+        ax.scatter(
+            x, y,
+            color=colors(name_),
+            edgecolor=edcolor,
+            alpha=alphaScater,
+            lw=0.9,
+            marker=markers(name_),
+            s=msizet * msize(name_),
+        )
+        return None, None
+
+    def _apply_xscale(ax, xparam, y_idx):
+        requested_scale = _value_for_y(xscale, y_idx, name_="xscale")
+        current_scale = requested_scale if requested_scale is not None else scales(xparam)
+
+        if xparam == "z_Birth":
+            ax.set_xscale("symlog", linthresh=0.02)
+            ax.set_xticks([0, 0.01, 0.1, 1, 10])
+            ax.set_xticklabels(["0", "$10^{-2}$", "0.1", "1", "10"])
+            return "symlog"
+
+        ax.set_xscale(current_scale)
+        if current_scale in ("log", "symlog"):
+            ax.xaxis.set_major_formatter(FuncFormatter(format_func_loglog))
+        return current_scale
+
+    def _apply_post_panel_formatting(ax, yparam, y_idx):
+        if GridMake:
+            ax.grid(
+                GridMake,
+                color="#9e9e9e",
+                which="major",
+                linewidth=0.6,
+                alpha=0.3,
+                linestyle=":",
+            )
+
+        requested_yscale = _value_for_y(yscales, y_idx, name_="yscales")
+        current_yscale = (
+            requested_yscale if requested_yscale is not None else scales(yparam)
+        )
+
+        ax.set_yscale(current_yscale)
+
+
+        # Force the project formatter on the Y axis
+        ax.yaxis.set_major_formatter(
+            FuncFormatter(format_func_loglog)
+        )
+
+    def _add_colorbar(fig_, axs_, sc, norm=None):
+        if COLORBAR is None:
+            return None
+        if sc is None and norm is None:
+            return None
+
+        cmap_obj = plt.cm.get_cmap(cmap)
+
+        if norm is not None:
+            mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap_obj)
+            mappable.set_array([])
+        else:
+            mappable = sc
+
+        if "Snap" in str(COLORBAR[0]):
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                ticks=[
+                    0.0, 1.97185714, 3.94371429, 5.91557143,
+                    7.88742857, 9.85928571, 11.83114286, 13.803,
+                ],
+                pad=0.02,
+                aspect=30,
+            )
+            cb.ax.set_yticklabels(["14", "12", "10", "8", "6", "4", "2", "0"])
+
+        elif COLORBAR[0] == "sSFRRatioPericenter":
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                ticks=[0, 0.5, 1, 1.5, 2],
+                pad=0.02,
+                aspect=(ratioColorbar or 50),
+            )
+            cb.ax.set_yticklabels(["0", "0.5", "1", "1.5", "2"])
+
+        elif COLORBAR[0] == "logStarZ_99":
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                ticks=[0, 0.1, 0.2, 0.3, 0.7],
+                pad=0.02,
+                aspect=(ratioColorbar or 50),
+            )
+            cb.ax.set_yticklabels(["0", "0.1", "0.2", "0.3", "0.7"])
+
+        elif COLORBAR[0] == "logStarZ_99_75dex":
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                ticks=[-0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0],
+                pad=0.02,
+                aspect=(ratioColorbar or 50),
+            )
+            cb.ax.set_yticklabels([
+                "-0.7", "-0.6", "-0.5", "-0.4",
+                "-0.3", "-0.2", "-0.1", "0",
+            ])
+
+        elif COLORBAR[0] == "z_At_FirstEntry":
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                ticks=[0.0, 0.5, 1.0, 1.5],
+                pad=0.02,
+                aspect=(ratioColorbar or 50),
+            )
+            cb.ax.set_yticklabels(["0", "0.5", "1.0", "1.5"])
+
+        else:
+            cb = fig_.colorbar(
+                mappable,
+                ax=axs_.ravel().tolist(),
+                pad=0.02,
+                aspect=(ratioColorbar or 50),
+            )
+
+        cb.set_label(
+            _label_from(labels, COLORBAR[0]),
+            fontsize=1.2 * fontlabel,
+        )
+        cb.ax.tick_params(labelsize=0.99 * fontlabel)
+        return cb
+
+    # ------------------------------------------------------------------
+    # Normalize user inputs
+    # ------------------------------------------------------------------
+    names = _as_list(names)
+    columns, ParamsX, ParamsY, label_general = _normalize_inputs(
+        columns, ParamX, ParamsY
+    )
+
+    BackgroundParamsX, BackgroundParamsY = _normalize_background_density(
+        BackGroudnDensity,
+        len(ParamsY),
+    )
+
+    if COLORBAR is not None:
+        COLORBAR = _as_list(COLORBAR)
+    if MarkerSizes is not None:
+        MarkerSizes = _as_list(MarkerSizes)
+    if LegendNames is not None:
+        LegendNames = _as_list(LegendNames)
+
+    dfTime = TNG.extractDF("SNAPS_TIME")
+
+    data_columns, dataX, dataY, dataColor, dataMarker = _load_data(
+        names, columns, ParamsX, ParamsY
+    )
+
+    dataBackgroundX, dataBackgroundY = _load_background_density(
+        names,
+        data_columns,
+        BackgroundParamsX,
+        BackgroundParamsY,
+    )
+
+    if columns == ["Snap"]:
+        panel_columns = ["Snap"] * len(data_columns)
+    else:
+        panel_columns = list(columns)
+
+    n_yparams = len(ParamsY)
+    n_panel_columns = len(panel_columns)
+
+    if ColumnPlot:
+        nrows = n_yparams
+        ncols = n_panel_columns
+    else:
+        nrows = n_panel_columns
+        ncols = n_yparams
+
+    fig, axs = _setup_axes(nrows=nrows, ncols=ncols)
+
+    sc_for_colorbar = None
+    norm_for_colorbar = None
+
+    # ------------------------------------------------------------------
+    # Main panel loop
+    # ------------------------------------------------------------------
+    for i in range(nrows):
+        for j in range(ncols):
+            y_idx, column_idx = _panel_indices(i, j)
+
+            yparam = ParamsY[y_idx]
+            xparam = ParamsX[y_idx]
+            colname = panel_columns[column_idx]
+            ax = axs[i, j]
+
+            ylimmin_for_y = _value_for_y(ylimmin, y_idx, name_="ylimmin")
+            ylimmax_for_y = _value_for_y(ylimmax, y_idx, name_="ylimmax")
+            xlimmin_for_y = _value_for_y(xlimmin, y_idx, name_="xlimmin")
+            xlimmax_for_y = _value_for_y(xlimmax, y_idx, name_="xlimmax")
+
+            xlim_pair = _panel_limit_pair(
+                xlims,
+                column_idx,
+                n_panel_columns,
+                "xlims",
+            )
+            ylim_pair = _panel_limit_pair(
+                ylims,
+                column_idx,
+                n_panel_columns,
+                "ylims",
+            )
+
+            _apply_special_background_rules(
+                ax, xparam, yparam, linewidth, fontlabel
+            )
+
+            # Background "All" layer
+            if All is not None:
+                xAll = np.asarray(All[xparam])
+                yAll = np.asarray(All[yparam])
+                good_all = np.isfinite(xAll) & np.isfinite(yAll)
+                ax.scatter(
+                    xAll[good_all],
+                    yAll[good_all],
+                    color=colors["All"],
+                    edgecolor=colors["All"],
+                    alpha=1.0,
+                    marker=".",
+                    s=10,
+                )
+
+            # Spearman accumulation for all populations in the panel
+            if SpearManTestAll:
+                XAllSMT = np.array([], dtype=float)
+                YAllSMT = np.array([], dtype=float)
+                CAllSMT = (
+                    np.array([], dtype=float) if COLORBAR is not None else None
+                )
+
+            # ----------------------------------------------------------
+            # Optional per-population background density
+            # ----------------------------------------------------------
+            if dataBackgroundX is not None and dataBackgroundY is not None:
+                requested_xscale = _value_for_y(
+                    xscale,
+                    y_idx,
+                    name_="xscale",
+                )
+                density_xscale = (
+                    requested_xscale
+                    if requested_xscale is not None
+                    else scales(xparam)
+                )
+
+                requested_yscale = _value_for_y(
+                    yscales,
+                    y_idx,
+                    name_="yscales",
+                )
+                density_yscale = (
+                    requested_yscale
+                    if requested_yscale is not None
+                    else scales(yparam)
+                )
+
+                if xparam == "z_Birth":
+                    density_xscale = "symlog"
+
+                for l, name_ in enumerate(names):
+                    idx = l
+                    if InvertPlot and column_idx == 1:
+                        idx = len(names) - l - 1
+
+                    x_background = np.asarray(
+                        dataBackgroundX[y_idx][column_idx][idx],
+                        dtype=float,
+                    )
+                    y_background = np.asarray(
+                        dataBackgroundY[y_idx][column_idx][idx],
+                        dtype=float,
+                    )
+
+                    _add_background_density(
+                        ax=ax,
+                        x=x_background,
+                        y=y_background,
+                        color=colors(name_),
+                        xscale_name=density_xscale,
+                        yscale_name=density_yscale,
+                        xlim_pair=xlim_pair,
+                        ylim_pair=ylim_pair,
+                    )
+                    
+                    if medianDot:
+                        good_background = (
+                            np.isfinite(x_background)
+                            & np.isfinite(y_background)
+                        )
+        
+                        if density_xscale == "log":
+                            good_background &= x_background > 0
+        
+                        if density_yscale == "log":
+                            good_background &= y_background > 0
+        
+                        if np.any(good_background):
+                            ax.scatter(
+                                np.nanmedian(x_background[good_background]),
+                                np.nanmedian(y_background[good_background]),
+                                marker="s",
+                                edgecolor="black",
+                                c=colors(name_),
+                                s=16 * msizet,
+                                lw=1.0,
+                                zorder=19,
+                                alpha=1.0,
+                            )
+
+            # ----------------------------------------------------------
+            # Population loop
+            # ----------------------------------------------------------
+            for l, name_ in enumerate(names):
+                idx = l
+                if InvertPlot and column_idx == 1:
+                    idx = len(names) - l - 1
+
+                x = np.asarray(dataX[y_idx][column_idx][idx], dtype=float)
+                y = np.asarray(dataY[y_idx][column_idx][idx], dtype=float)
+
+                if x.shape != y.shape:
+                    raise ValueError(
+                        f"X and Y shapes differ in panel "
+                        f"(yparam={yparam}, column={data_columns[column_idx]}, "
+                        f"name={name_}): {x.shape} versus {y.shape}."
+                    )
+
+                good = np.isfinite(x) & np.isfinite(y)
+                x_plot = x[good]
+                y_plot = y[good]
+
+                # Colorbar values
+                cvals = None
+                if dataColor is not None:
+                    color_panel = _auxiliary_panel(
+                        dataColor, y_idx, column_idx, "COLORBAR"
+                    )
+                    c_all = np.asarray(color_panel[idx], dtype=float)
+                    if c_all.shape != x.shape:
+                        raise ValueError(
+                            f"COLORBAR shape differs from X/Y in panel "
+                            f"(yparam={yparam}, column={data_columns[column_idx]}, "
+                            f"name={name_}): {c_all.shape} versus {x.shape}."
+                        )
+                    cvals = c_all[good]
+
+                # Marker-size flags
+                mflags = None
+                if dataMarker is not None:
+                    marker_panel = _auxiliary_panel(
+                        dataMarker, y_idx, column_idx, "MarkerSizes"
+                    )
+                    m_all = np.asarray(marker_panel[idx])
+                    if m_all.shape != x.shape:
+                        raise ValueError(
+                            f"MarkerSizes shape differs from X/Y in panel "
+                            f"(yparam={yparam}, column={data_columns[column_idx]}, "
+                            f"name={name_}): {m_all.shape} versus {x.shape}."
+                        )
+                    mflags = m_all[good]
+
+                # Per-population Spearman test
+                if SpearManTest and not SpearManTestAll:
+                    if len(x_plot) >= 2:
+                        corr, pval = spearmanr(x_plot, y_plot)
+                    else:
+                        corr, pval = np.nan, np.nan
+                    print("Name:", name_, "corr:", corr, "p:", pval)
+
+                # Scatter
+                sc_local, norm_local = _scatter_one(
+                    ax,
+                    x_plot,
+                    y_plot,
+                    name_,
+                    color_values=cvals,
+                    marker_flags=mflags,
+                )
+                if sc_local is not None or norm_local is not None:
+                    sc_for_colorbar = sc_local
+                    norm_for_colorbar = norm_local
+
+                # Medians / quantiles
+                if medianBins:
+                    xmean, ymed, yq_hi, yq_lo = MATH.split_quantiles(
+                        x_plot,
+                        y_plot,
+                        total_bins=bins,
+                        quantile=quantile,
+                    )
+                    ax.errorbar(
+                        xmean,
+                        ymed,
+                        yerr=(ymed - yq_lo, yq_hi - ymed),
+                        ls="None",
+                        markeredgecolor="black",
+                        elinewidth=2,
+                        ms=10,
+                        fmt="s",
+                        c=colors(name_),
+                    )
+
+                elif medianDot:
+                    if COLORBAR is not None:
+                        if medianDotStar:
+                            ax.scatter(
+                                np.nanmedian(x_plot),
+                                np.nanmedian(y_plot),
+                                marker="*",
+                                edgecolor="black",
+                                c=colors(name_),
+                                s=30 * msizetstar,
+                                lw=1.1,
+                                zorder=20,
+                                alpha=1.0,
+                            )
+                        elif COLORBAR[0] == "last_look_BH":
+                            ax.scatter(
+                                np.nanmedian(x_plot),
+                                np.nanmedian(y_plot),
+                                marker=markers(name_ + "Colorbar"),
+                                edgecolor="red",
+                                c=colors(name_),
+                                s=2 * msizet * msize(name_ + "Colorbar"),
+                                lw=1.7,
+                                zorder=20,
+                                alpha=1.0,
+                            )
+                        else:
+                            ax.scatter(
+                                np.nanmedian(x_plot),
+                                np.nanmedian(y_plot),
+                                marker=markers(name_ + "Colorbar"),
+                                edgecolor="red",
+                                facecolor="none",
+                                s=1.5 * msizet * msize(name_ + "Colorbar"),
+                                lw=1.7,
+                                zorder=20,
+                                alpha=1.0,
+                            )
+                    else:
+                        ax.scatter(
+                            np.nanmedian(x_plot),
+                            np.nanmedian(y_plot),
+                            marker="*",
+                            edgecolor="black",
+                            c=colors(name_),
+                            s=33 * msizet,
+                            lw=1.3,
+                            zorder=20,
+                            alpha=1.0,
+                        )
+
+                elif medianAll:
+                    xmean, ymed, yq_hi, yq_lo = MATH.split_quantiles(
+                        x_plot,
+                        y_plot,
+                        total_bins=bins,
+                    )
+                    ax.plot(
+                        xmean,
+                        ymed,
+                        color=colors(name_),
+                        ls=lines(name_),
+                        linewidth=linewidth,
+                    )
+                    ax.fill_between(
+                        xmean,
+                        yq_lo,
+                        yq_hi,
+                        color=colors(name_),
+                        alpha=alphaShade,
+                    )
+
+                # Accumulate all populations
+                if SpearManTestAll:
+                    XAllSMT = np.append(XAllSMT, x_plot)
+                    YAllSMT = np.append(YAllSMT, y_plot)
+                    if CAllSMT is not None and cvals is not None:
+                        CAllSMT = np.append(CAllSMT, cvals)
+
+            # ----------------------------------------------------------
+            # Panel-level Spearman tests
+            # ----------------------------------------------------------
+            if SpearManTestAll:
+                finite_xy = np.isfinite(XAllSMT) & np.isfinite(YAllSMT)
+                if finite_xy.sum() >= 2:
+                    corr, pval = spearmanr(
+                        XAllSMT[finite_xy], YAllSMT[finite_xy]
+                    )
+                else:
+                    corr, pval = np.nan, np.nan
+                print("Panel Spearman X and Y corr:", corr, "p:", pval)
+
+                if CAllSMT is not None and len(CAllSMT) == len(XAllSMT):
+                    finite_xc = np.isfinite(XAllSMT) & np.isfinite(CAllSMT)
+                    if finite_xc.sum() >= 2:
+                        corr, pval = spearmanr(
+                            XAllSMT[finite_xc], CAllSMT[finite_xc]
+                        )
+                    else:
+                        corr, pval = np.nan, np.nan
+                    print("Panel Spearman X and Colorbar corr:", corr, "p:", pval)
+
+                    finite_cy = np.isfinite(CAllSMT) & np.isfinite(YAllSMT)
+                    if finite_cy.sum() >= 2:
+                        corr, pval = spearmanr(
+                            CAllSMT[finite_cy], YAllSMT[finite_cy]
+                        )
+                    else:
+                        corr, pval = np.nan, np.nan
+                    print("Panel Spearman Colorbar and Y corr:", corr, "p:", pval)
+
+                print("\n")
+
+            # Equal line
+            if (
+                EqualLine
+                and EqualLineMin is not None
+                and EqualLineMax is not None
+            ):
+                xx = np.linspace(EqualLineMin, EqualLineMax)
+                ax.plot(
+                    xx, xx, ls="--", color="tab:blue", linewidth=linewidth
+                )
+
+            # ----------------------------------------------------------
+            # Scales, limits, and project-specific ticks
+            # ----------------------------------------------------------
+           
+
+            if ylimmin_for_y is not None and ylimmax_for_y is not None:
+                ax.set_ylim(ylimmin_for_y, ylimmax_for_y)
+
+            if xlimmin_for_y is not None and xlimmax_for_y is not None:
+                ax.set_xlim(xlimmin_for_y, xlimmax_for_y)
+
+            # Explicit panel-wise pairs take precedence over the older
+            # xlimmin/xlimmax and ylimmin/ylimmax interfaces.
+            if ylim_pair is not None:
+                ax.set_ylim(*ylim_pair)
+
+            if xlim_pair is not None:
+                ax.set_xlim(*xlim_pair)
+
+            
+            
+            _apply_post_panel_formatting(ax, yparam, y_idx)
+            _apply_xscale(ax, xparam, y_idx)
+
+            _apply_special_xaxis_rules(
+                ax=ax,
+                ParamX_=xparam,
+                yparam=yparam,
+                ylimmin_for_y=ylimmin_for_y,
+                fontlabel_=fontlabel,
+            )
+            
+            
+            
+            # ----------------------------------------------------------
+            # Axis labels and in-panel sample/snapshot titles
+            # ----------------------------------------------------------
+            # Keep the numerical Y axis and its ylabel. In the transposed
+            # layout this gives one ylabel for every stacked row, matching the
+            # style of the reference figure.
+            if j == 0:
+                ax.set_ylabel(
+                    _y_parameter_label(yparam),
+                    fontsize=1.2 * fontlabel,
+                )
+                ax.tick_params(axis="y", labelsize=0.99 * fontlabel)
+                
+                ax.yaxis.set_major_formatter(
+                    FuncFormatter(format_func_loglog)
+                )
+                
+                if yparam == 'sigma_InSitu':
+                    ax.set_yticks([20, 30, 40, 50, 60])
+                    ax.set_yticklabels(['20', '30', '40', '50', '60'])
+                
+
+            # ``title`` identifies the sample/snapshot dimension. Instead of
+            # using ax.set_title(), place it inside the relevant panel.
+            if colname == "Snap" or title:
+                if ColumnPlot:
+                    # One title per visual column, placed in the top panel.
+                    title_panel = i == 0
+                else:
+                    # One title per visual row, placed in its first panel.
+                    title_panel = j == 0
+
+                if title_panel:
+                    _add_panel_title_text(
+                        ax,
+                        _panel_column_label(column_idx),
+                    )
+
+            # Preserve Y tick labels on the transposed stacked panels.
+            if not ColumnPlot:
+                ax.tick_params(axis="y", labelsize=0.99 * fontlabel)
+
+            # One optional in-panel Y-parameter annotation per visual Y dimension.
+            if xlabelintext:
+                if ColumnPlot:
+                    annotation_panel = j == ncols - 1
+                else:
+                    annotation_panel = i == 0
+
+                if annotation_panel:
+                    Afont = {
+                        "color": "black",
+                        "size": fontlabel,
+                    }
+                    anchored_text = AnchoredText(
+                        _label_from(texts, yparam),
+                        loc="upper right",
+                        prop=Afont,
+                    )
+                    ax.add_artist(anchored_text)
+
+            # X labels only on the last visual row.
+            if i == nrows - 1:
+                ax.set_xlabel(
+                    _x_parameter_label(xparam),
+                    fontsize=1.2 * fontlabel,
+                )
+                ax.tick_params(axis="x", labelsize=0.99 * fontlabel)
+            elif not ColumnPlot:
+                # With independent row-wise xlims, Matplotlib no longer
+                # suppresses the upper tick labels automatically.
+                ax.tick_params(axis="x", labelbottom=False)
+
+            # ----------------------------------------------------------
+            # Legends: positions remain physical (column, row)
+            # ----------------------------------------------------------
+            if legend and LegendNames is not None and legpositions is not None:
+                for legpos, LegendName in enumerate(LegendNames):
+                    if legpos >= len(legpositions):
+                        continue
+
+                    if ColumnPlot:
+                        legend_column = legpositions[legpos][0]
+                        legend_row = legpositions[legpos][1]
+                    else:
+                        # Keep the requested position attached to the same
+                        # sample/snapshot panel after transposing the grid:
+                        # [column, row] -> [row, column].
+                        legend_row = legpositions[legpos][0]
+                        legend_column = legpositions[legpos][1]
+
+                    if j == legend_column and i == legend_row:
+                        custom_lines, label, ncol, _mult = Legend(
+                            LegendName,
+                            msizeMult=msizeMult,
+                            linewidth=linewidth,
+                        )
+
+                        ax.legend(
+                            custom_lines,
+                            label,
+                            ncol=ncol,
+                            loc=_value_for_index(loc, legpos, "best"),
+                            fontsize=0.88 * fontlabel,
+                            framealpha=framealpha,
+                            columnspacing=columnspacing,
+                            handlelength=handlelength,
+                            handletextpad=handletextpad,
+                            labelspacing=labelspacing,
+                            handler_map={Circle: HandlerCircle()},
+                        )
+
+    # ------------------------------------------------------------------
+    # Automatic layer legend for the density mode
+    # ------------------------------------------------------------------
+    if BackGroudnDensity is not None and legend:
+        layer_handles = [
+            mpl.patches.Patch(
+                facecolor="0.5",
+                edgecolor="0.5",
+                alpha=alphaShade,
+                label="all stars, density",
+            ),
+            mpl.lines.Line2D(
+                [0],
+                [0],
+                color="black",
+                marker=m,
+                linestyle="none",
+                markersize=0.75 * msizet,
+                label="in-situ stars",
+            ),
+        ]
+
+        if medianDot:
+            layer_handles.append(
+                mpl.lines.Line2D(
+                    [0],
+                    [0],
+                    color="black",
+                    marker="*",
+                    markeredgecolor="black",
+                    linestyle="none",
+                    markersize=1.10 * msizet,
+                    label="in-situ median",
+                )
+            )
+
+        layer_ax = axs[1,0]
+        previous_legend = layer_ax.get_legend()
+        if previous_legend is not None:
+            layer_ax.add_artist(previous_legend)
+
+        layer_ax.legend(
+            handles=layer_handles,
+            ncol=1,
+            loc="lower left",
+            fontsize=0.88 * fontlabel,
+            framealpha=framealpha,
+            columnspacing=columnspacing,
+            handlelength=handlelength,
+            handletextpad=0.35,
+            labelspacing=labelspacing,
+        )
+
+    # ------------------------------------------------------------------
+    # Global colorbar and output
+    # ------------------------------------------------------------------
+    _add_colorbar(
+        fig,
+        axs,
+        sc_for_colorbar,
+        norm=norm_for_colorbar,
+    )
+
+    savefig(savepath, savefigname, TRANSPARENT)
+    return
 def PlotProfile(
     # -------------------------
     # Required data inputs
