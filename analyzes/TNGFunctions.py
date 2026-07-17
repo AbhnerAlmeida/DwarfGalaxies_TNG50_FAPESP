@@ -35,6 +35,8 @@ import warnings
 from pytreegrav import Potential
 from scipy.signal import find_peaks
 
+from scipy.interpolate import PchipInterpolator
+
 from multiprocessing import Pool, Manager
 import math
 
@@ -1752,7 +1754,7 @@ def EvolutionParticle(Params, IDs, dfSample, SizeLim = 'Rhpkpc', slim = [0.5, 1.
                         Cond = (R > 0)
                         
                 if 'Accreted' in Param:
-                    dfGasAccreted, dfStarAccreted, dfDMAccreted = ParticleParameters(f, ID, snap)
+                    dfGasAccreted, dfStarAccreted, dfDMAccreted, Pos_dic, Vel_dic = ParticleParameters(f, ID, snap)
                     if 'Gas' in Param or 'SFR' in Param:
                         IDsCurrent = IDsGas_Current
                         Infalling = dfGasAccreted.loc[
@@ -7125,55 +7127,106 @@ def _weighted_median(x, w):
     c = np.cumsum(w) - 0.5*w
     return x[np.searchsorted(c, 0.5*np.sum(w))]
 
+
+
 def _solve_r200_kpc(R_kpc_sorted, Mcum_Msun_sorted, rho_c_kpc3, overdensity=200.0):
-    """Resolve M(<R) = (4/3)*pi*Δ*rho_c*R^3 por bisseção com PCHIP."""
-    valid = np.isfinite(R_kpc_sorted) & np.isfinite(Mcum_Msun_sorted)
-    R = np.asarray(R_kpc_sorted[valid]); M = np.asarray(Mcum_Msun_sorted[valid])
-    positive = R > 0
-    R, M = R[positive], M[positive]
+    """
+    Resolve M(<R) = (4/3) pi Delta rho_c R^3.
+
+    Parameters
+    ----------
+    R_kpc_sorted : array
+        Radii in physical kpc.
+    Mcum_Msun_sorted : array
+        Cumulative enclosed mass in Msun.
+    rho_c_kpc3 : float
+        Critical density in Msun/kpc^3.
+    overdensity : float
+        Overdensity threshold, usually 200.
+
+    Returns
+    -------
+    R200_kpc, M200_Msun
+    """
+
+    R = np.asarray(R_kpc_sorted, dtype=float)
+    M = np.asarray(Mcum_Msun_sorted, dtype=float)
+
+    valid = np.isfinite(R) & np.isfinite(M) & (R > 0) & (M > 0)
+    R = R[valid]
+    M = M[valid]
+
     if len(R) < 5:
         return np.nan, np.nan
+
     idx = np.argsort(R)
-    R, M = R[idx], M[idx]
+    R = R[idx]
+    M = M[idx]
+
+    # Remove duplicate radii
     R, uniq_idx = np.unique(R, return_index=True)
     M = M[uniq_idx]
+
     if len(R) < 5:
         return np.nan, np.nan
 
-    M_of_R = chipInterpolator(R, M, extrapolate=False)
+    # Garantir monotonicidade da massa cumulativa
+    M = np.maximum.accumulate(M)
 
-    def F(Rval):
-        Mlhs = M_of_R(Rval)
-        Mrhs = (4.0/3.0)*np.pi*overdensity*rho_c_kpc3*(Rval**3)
-        return Mlhs - Mrhs
+    prefac = (4.0 / 3.0) * np.pi * overdensity * rho_c_kpc3
 
-    a, b = R[0], R[-1]
-    fa, fb = F(a), F(b)
-    if not (np.isfinite(fa) and np.isfinite(fb) and fa*fb <= 0):
-        for _ in range(8):
-            b *= 1.5
-            fb = F(b)
-            if np.isfinite(fa) and np.isfinite(fb) and fa*fb <= 0:
-                break
-        else:
+    def target_mass(r):
+        return prefac * r**3
+
+    F = M - target_mass(R)
+
+    # Procurar mudança de sinal dentro do intervalo amostrado
+    sign_change = np.where(F[:-1] * F[1:] <= 0)[0]
+
+    if len(sign_change) == 0:
+        # Não há solução dentro do intervalo coberto pelas partículas.
+        # Isso pode acontecer se o cutout não vai longe o suficiente,
+        # ou se a definição de R200 não é apropriada para esse subhalo.
+        return np.nan, np.nan
+
+    # Para R200, normalmente queremos o cruzamento mais externo
+    i = sign_change[-1]
+
+    a = R[i]
+    b = R[i + 1]
+
+    M_of_R = PchipInterpolator(R, M, extrapolate=False)
+
+    def F_interp(r):
+        return float(M_of_R(r) - target_mass(r))
+
+    fa = F_interp(a)
+    fb = F_interp(b)
+
+    if not (np.isfinite(fa) and np.isfinite(fb)):
+        return np.nan, np.nan
+
+    # Bisseção
+    for _ in range(80):
+        c = 0.5 * (a + b)
+        fc = F_interp(c)
+
+        if not np.isfinite(fc):
             return np.nan, np.nan
 
-    for _ in range(60):
-        c = 0.5*(a+b)
-        fc = F(c)
-        if not np.isfinite(fc):
-            b = c
-            continue
-        if abs(fc) < 1e-8:
-            a = b = c
+        if abs(fc) < 1e-8 * max(target_mass(c), 1.0):
             break
-        if fa*fc <= 0:
-            b = c; fb = fc
-        else:
-            a = c; fa = fc
 
-    R200 = 0.5*(a+b)
-    M200 = (4.0/3.0)*np.pi*200.0*rho_c_kpc3*(R200**3)
+        if fa * fc <= 0:
+            b = c
+            fb = fc
+        else:
+            a = c
+            fa = fc
+
+    R200 = 0.5 * (a + b)
+    M200 = float(M_of_R(R200))
+
     return R200, M200
 
 def _center_and_bulk(pos, vel, mass):

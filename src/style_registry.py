@@ -301,6 +301,12 @@ BASE_colors = {
         'SatelliteInteractError':   'tab:red',
         'CentralError':  'gray',
         
+        "StellarMassFromFlybys": 'darkviolet',
+        "StellarMassFromOngoingMergers":  'forestgreen',
+        "StellarMassFromCompletedMergers":  'royalblue',
+        "StellarMassExSitu": 'black',
+        
+        
         #Random
         '0': 'red', 
         '1': 'sienna',
@@ -378,6 +384,12 @@ BASE_lines = {
 
         #EVOLUTION
         
+        "StellarMassFromFlybys": (0,(0.1,2)),
+        "StellarMassFromOngoingMergers": (0,(0.1,2)),
+        "StellarMassFromCompletedMergers": (0, (10, 8)),
+        "StellarMassExSitu": 'solid',
+        
+        
         'Type0': (0, (10, 8)),
         'Type1': (0,(0.1,2)),
         'Type4': 'solid',
@@ -428,6 +440,7 @@ BASE_scales = {
     
     'RadEx': 'log',
     'RadIn': 'log',
+    'GasjAccreted': 'log',
 
     'vrot_InSitu_component': 'log',
     'sigma_InSitu': 'log',
@@ -657,6 +670,13 @@ BASE_titles = {
     'StellarMassExSituMajor': r'Major mergers',
     
     
+    #
+    "StellarMassFromFlybys": r'Fly-bys',
+    "StellarMassFromOngoingMergers": r'Ongoing mergers',
+    "StellarMassFromCompletedMergers": r'Completed mergers',
+    "StellarMassExSitu": r'Total ex situ',
+    
+    
     #Mass
     
     'GasMass_In_TrueRhpkpc':   r'$r \leq  r_{1/2,\; z=0}$',
@@ -744,9 +764,9 @@ labelsequal = {
     'ExMassType1Evolution': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
     'ExMassType4Evolution': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
     
-    'RadIn': r'$\overline{r}_\mathrm{in-situ} [\mathrm{kpc}]$',
-    'RadEx': r'$\overline{r}_\mathrm{ex-situ}  [\mathrm{kpc}]$',
-    'SigmaIn': r'$\sigma_\mathrm{v, in-situ}  [\mathrm{km\, s}^{-1}]$',
+    'RadIn': r'$\overline{r}_\mathrm{in\,situ} [\mathrm{kpc}]$',
+    'RadEx': r'$\overline{r}_\mathrm{ex\,situ}  [\mathrm{kpc}]$',
+    'SigmaIn': r'$\sigma_\mathrm{v, in-\,situ}  [\mathrm{km\, s}^{-1}]$',
     
     'logSUM_Mstar_merger_Corotate' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
     'logSUM_Mstar_merger_Perpendicular' : r'$\log(M_{\star,\,\mathrm{mergers}} / \mathrm{M}_\odot)$',
@@ -785,7 +805,8 @@ labelsequal = {
     'dt_Entry_To_NoGas_Gyr': r'$(\Delta t)$^\mathrm{entry-to-gas-loss}',
     
     'l200': r'$\lambda_{200}$',
-    
+    'l200_AppBFig': r'$\lambda_{200}$',
+
     'l200_NewMeanAfter1Gyr': r'$\lambda_{200}$',
     'l200_NewMeanAfter5Gyr': r'$\lambda_{200}$',
     'l200_NewMeanAfter8Gyr': r'$\lambda_{200}$',
@@ -812,6 +833,11 @@ labels = {
     'Type4': 'Stars',
     
     #SUBHALO
+    "StellarMassFromFlybys": r'$\log(M_{\star}/\mathrm{M}_\odot)$',
+    "StellarMassFromOngoingMergers": r'$\log(M_{\star}/\mathrm{M}_\odot)$',
+    "StellarMassFromCompletedMergers": r'$\log(M_{\star}/\mathrm{M}_\odot)$',
+    "StellarMassExSitu": r'$\log(M_{\star}/\mathrm{M}_\odot)$',
+    
     
     #Sizes
     'logHalfRadstar_99': r'$\log(r_{1/2, \, z = 0}/\mathrm{kpc})$',
@@ -831,6 +857,10 @@ labels = {
     'SubhaloMassType1': r'$\log(M_{\mathrm{DM}}/\mathrm{M}_\odot)$',
     'SubhaloMassType4': r'$\log(M_{\star}/\mathrm{M}_\odot)$',
     
+    "StarMass_Corotate_Accreted": r'$\log(M_{\mathrm{gas,\,corot,\,acc}}/\mathrm{M}_\odot)$',
+    "GasMass_Corotate_Accreted": r'$\log(M_{\mathrm{DM,\,corot,\,acc}}/\mathrm{M}_\odot)$',
+    "DMMass_Corotate_Accreted": r'$\log(M_{\star\mathrm{,\,corot,\,acc}}/\mathrm{M}_\odot)$',
+    "Mass_Corotate_Accreted": r'$\log(M_{\mathrm{corot,\,acc}}/\mathrm{M}_\odot)$',
     'Mgas_Norm_Max_99':r'$(M_{z = 0}/ M_\mathrm{max})_\mathrm{gas}$',
     'MDM_Norm_Max_99': r'$(M_{z = 0}/ M_\mathrm{max})_\mathrm{DM}$',
     'Mstar_Norm_Max_99': r'$(M_{z = 0}/ M_\mathrm{max})_\star$',
@@ -858,6 +888,7 @@ labels = {
     'vrot_InSitu_component': r"$\langle v_{\rm rot}\rangle [{\rm km\,s^{-1}}]$",
     'sigma_InSitu':r"$\sigma_{ v}\ [{\rm km\,s^{-1}}]$",
 
+    
     
     #SFR
     'SubhalosSFRInHalfRad': r'$\log(\mathrm{sSFR}_{r < r_{1/2}}/\mathrm{yr}^{-1})$',
@@ -888,7 +919,7 @@ labels = {
     
     'Frac_ExSitu': r'$(M_{\mathrm{ex-situ}} / M_{\star})$',
     
-    'StellarMassExSitu': r'$\log(M_{\mathrm{ex-situ}}/\mathrm{M}_\odot)$',
+    'StellarMassExSitu': r'$\log(M_{\star,\mathrm{\,ex situ}}/\mathrm{M}_\odot)$',
 
     'StellarMassExSituMinor': r'$\log(M_{\mathrm{ex-situ,\; minor\; merger}}/\mathrm{M}_\odot)$',
     'StellarMassExSituIntermediate': r'$\log(M_{\mathrm{ex-situ,\; intermediate\; merger}}/\mathrm{M}_\odot)$',
@@ -922,7 +953,7 @@ labels = {
     'logM200_99': r'$\log(M_{200}/\mathrm{M}_\odot)_{z = 0}$',
     'roverR200_99': r'$(R/R_{200})_{z = 0}$',
 
-
+    'GasjAccreted': r'$j_{\mathrm{gas,\,acc}} \, \, [\mathrm{kpc\,km\, s^{-1}}]$',
     #AngularMomentum
     'MassTensorEigenVals': r'$\mu_1 / \sqrt{\mu_2 \mu_3}$',
     'logjProfile': r'$\log (j_{\mathrm{gas}} / \, \, [\mathrm{kpc \; km  \; s^{-1}}])$',
@@ -960,6 +991,10 @@ labels = {
     'logStarZ_99': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
     'logStarZ_99_75dex': r'$\log( Z_\star / Z_\odot)_{z = 0}$',
     'l200': r'$\lambda_{200}$',
+
+    
+
+    'l200_AppBFig': r'$\lambda_{200}$',
     
     'l200_NewMeanAfter1Gyr': r'$\lambda_{200}$',
     'l200_NewMeanAfter5Gyr': r'$\lambda_{200}$',

@@ -5834,13 +5834,21 @@ def PlotScatterColumn(
                 )
                 ax.tick_params(axis="y", labelsize=0.99 * fontlabel)
                 
-                ax.yaxis.set_major_formatter(
-                    FuncFormatter(format_func_loglog)
-                )
+                current_yscale = scales(yparam)
+                
+                
+                if 'log' in current_yscale:
+                    ax.yaxis.set_major_formatter(
+                        FuncFormatter(format_func_loglog)
+                    )
                 
                 if yparam == 'sigma_InSitu':
                     ax.set_yticks([20, 30, 40, 50, 60])
                     ax.set_yticklabels(['20', '30', '40', '50', '60'])
+                    
+                if yparam == 'U-r':
+                    ax.set_yticks([0, 1, 2])
+                    ax.set_yticklabels(['0', '1', '2'])
                 
 
             # ``title`` identifies the sample/snapshot dimension. Instead of
@@ -7575,3 +7583,2902 @@ def MakeLines(j, ax,  yIDs, xIDs, IDs, notIndex, colors):
     #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)], y_p2[~np.isnan(y_p2)], y_p97[~np.isnan(y_p97)], color=ColorFill, alpha=0.2)  # 2σ equivalent
     #else:
     #    axs[j][linplot].fill_between(xvalues[~np.isnan(y_p2)] , y_p2[~np.isnan(y_p2)]  * xvalues[~np.isnan(y_p2)]**2., y_p97[~np.isnan(y_p97)]  * xvalues[~np.isnan(y_p97)]**2., color=ColorFill, alpha=0.2)  # 2σ equivalent
+    
+    
+# -----------------------------------------------------------------------------
+# Individual histories in columns, with population references and merger epochs
+# -----------------------------------------------------------------------------
+
+def PlotIDsColumnsWithMergers(
+    IDs=None,
+    rows=None,
+    PopulationName="DiffuseCentral",
+    size_param="SubhaloHalfmassRadType4",
+    dfName="PaperIII",
+    SampleName="Samples",
+    Name="Name",
+    ID_key="SubfindID_99",
+    SIM=SIMTNG,
+
+    # Selection when IDs is not supplied
+    n_examples=6,
+    selection="final_size",  # "random" or "final_size"
+
+    # Population median references, following PlotMedianEvolution
+    MedianEvolution=True,
+    MedianPopulations=("Diffuse", "Normal"),
+    MedianColumn="Central",
+    QuantileError=True,
+    quantiles=(16.0, 84.0),  # used only by the direct-history fallback
+    nboots=100,
+
+    # Multi-parameter rows. Each element of ``rows`` may be either a string
+    # or a list/tuple of parameters to be overplotted in the same panel.
+    row_labels=None,
+    component_colors=None,
+    component_line_styles=None,
+    component_linewidths=None,
+    grouped_band_alpha_scale=0.55,
+    show_component_legend=True,
+    # Population references are omitted from rows containing several
+    # overplotted parameters unless explicitly requested.
+    median_on_grouped_rows=False,
+
+    # Extra individual histories overplotted on one existing visual row.
+    # These curves do not enter the Diffuse/Normal median calculation.
+    additional_individual_lines=None,
+    additional_individual_row=-1,
+    additional_individual_columns=None,
+    additional_individual_colors=None,
+    additional_individual_linestyles=None,
+    additional_individual_linewidths=None,
+    additional_individual_labels=None,
+    additional_individual_alpha=1.0,
+    additional_individual_zorder=5,
+
+    # The legend for these extra histories is placed inside the same row.
+    show_additional_individual_legend=True,
+    additional_individual_legend_column=0,
+    additional_individual_legend_loc="best",
+    additional_individual_legend_ncol=1,
+    additional_individual_legend_fontscale=0.68,
+
+    # Compact labels for separate Stars/Gas/DM accreted-mass rows.
+    # The long parameter-specific y labels are replaced by one shared label,
+    # while the component name is written inside the first-column panel.
+    compact_component_labels=True,
+    shared_component_ylabel=True,
+    component_ylabel_text=(
+        r"$\log(M_{\rm acc,\,co\mbox{-}rot}/\mathrm{M}_\odot)$"
+    ),
+    component_text_in_first_column=True,
+    component_text_position=(0.045, 0.88),
+    component_text_fontscale=0.82,
+    component_text_bbox_alpha=0.68,
+    component_ylabel_x=0.017,
+
+    # Merger information. Prefer the event-by-event catalogue because it
+    # contains the exact snapshot, mass-ratio class, and angular-momentum angle.
+    use_merger_catalog=True,
+    merger_snap_key="Snap",
+    merger_type_key="Type",
+    merger_angle_key="thetaPlusOrbit",
+    merger_mass_ratio_key="mustar",
+    merger_stellar_mass_key="StarMass",
+
+    # Paper-I mass-ratio nomenclature, using
+    # mu_star = M_star,secondary / M_star,primary:
+    # major: mu_star >= 1/4
+    # intermediate: 1/10 <= mu_star < 1/4
+    # minor: mu_star < 1/10
+    classify_merger_type_from_mass_ratio=True,
+    major_mass_ratio_min=0.25,
+    intermediate_mass_ratio_min=0.10,
+    merger_types_to_plot=("Major", "Intermediate", "Minor"),
+
+    # Same angular ranges adopted in the manuscript.
+    co_rotate_range=(0.0, 45.0),
+    perpendicular_range=(80.0, 100.0),
+    counter_rotate_range=(135.0, 180.0),
+    orientation_encoding=True,
+    orientation_colors=None,
+    merger_orientations_to_plot=(
+        "Co-rotating",
+        "Perpendicular",
+        "Counter-rotating",
+    ),
+    show_other_orientations=False,
+
+    # Cumulative-history fallback if an individual merger catalogue is absent.
+    major_merger_param="NumMajorMergersTotal",
+    minor_merger_param="NumMinorMergersTotal",
+    show_major=True,
+    show_intermediate=True,
+    show_minor=True,
+    merger_color="crimson",
+
+    # Line style identifies the Paper-I mass-ratio class. The intermediate
+    # class is solid and thicker than minor mergers, avoiding confusion with
+    # the long-dashed entry-time indicator.
+    major_linestyle="--",
+    intermediate_linestyle="-",
+    minor_linestyle=":",
+    merger_linewidth=1.3,
+    major_linewidth_factor=2.0,
+    intermediate_linewidth_factor=1.30,
+    minor_linewidth_factor=0.80,
+    merger_alpha=0.55,
+    # Rows on which merger epochs are drawn. By default, only the first
+    # visual row carries the vertical event lines.
+    merger_rows=(0,),
+
+    # Satellite entry time. The snapshot is converted to cosmic age through
+    # SNAPS_TIME instead of assuming a fixed 99-snapshot array index.
+    EntryTime=False,
+    entry_snap_key="Snap_At_FirstEntry",
+    entry_rows=None,
+
+    # When central and satellite IDs are mixed, entry is shown only for
+    # objects identified as satellites. Explicit SatelliteIDs take priority;
+    # SatellitePopulations and common sample flags are used as fallbacks.
+    entry_only_satellites=True,
+    SatelliteIDs=None,
+    SatellitePopulations=None,
+    satellite_flag_key=None,
+
+    entry_color="black",
+    entry_linestyle=".-",
+    entry_linewidth=0.95,
+    entry_alpha=0.85,
+    entry_label="First entry",
+
+    # Keep the entry-time legend separate from the two merger legends.
+    # Column indices are zero-based, so 3 corresponds to the fourth column.
+    entry_legend_column=3,
+    entry_legend_loc="best",
+    entry_legend_fontscale=0.68,
+
+    # Layout
+    cNum=2.35,
+    lNum=1.75,
+    hspace=0.0,
+    wspace=0.0,
+    LookBackTime=True,
+    shared_xlabel=False,
+
+    # PlotIDsColumns-style top redshift axes.
+    add_redshift_axis=True,
+    redshift_axis_all_columns=True,
+    redshift_axis_column=0,
+    redshift_values=(0.0, 0.2, 0.5, 1.0, 2.0, 5.0, 20.0),
+    redshift_hide_left_edge_after_first=True,
+    redshift_tick_fontscale=0.78,
+    redshift_label_fontscale=1.0,
+    redshift_tick_pad=1.5,
+    redshift_label_pad=1.0,
+
+    # Keep ID titles clear of the redshift ticks/label.
+    title_in_panel_with_redshift=True,
+    title_in_panel_position=(0.025, 0.955),
+    title_in_panel_bbox_alpha=0.72,
+
+    GridMake=False,
+
+    # Figure-level label placement. These defaults move the shared x label
+    # and figure legend closer to the panel grid without changing figsize.
+    shared_xlabel_y=0.030,
+    legend_bbox_to_anchor=(0.5, 0.955),
+    legend_borderaxespad=0.0,
+    figure_top_margin=None,
+    figure_bottom_margin=None,
+
+    # Limits
+    xlim=None,
+    ylim=None,
+    ylims=None,
+
+    # Style
+    individual_color="black",
+    individual_linestyle="-",
+    linewidth=1.15,
+
+    # Make the test-galaxy history clearly dominate over the population
+    # references and the source-decomposition curves.
+    individual_linewidth_factor=1.40,
+
+    median_linewidth=1.00,
+    alpha_line=1.0,
+    alphaShade=0.18,
+    fontlabel=11,
+    multtick=0.88,
+    framealpha=0.90,
+    title_prefix="ID",
+    title_pad=4.0,
+
+    # Legend
+    legend=True,
+    legend_loc="best",
+    legend_ncol=2,
+    legend_on_figure=False,
+    ADD_CentSat = None,
+
+    # Diagnostics / compact information inside each ID panel
+    event_window=1,
+    annotate_counts=False,
+    annotate_orientation_counts=True,
+    annotation_fontscale=0.58,
+    annotation_position=(0.98, 0.965),
+
+    # Output
+    save=True,
+    savepath="PaperIII/PlotIndividualSizeHistories",
+    savefigname="DiffuseCentral_IndividualEvolution_MajorMinor",
+    TRANSPARENT=False,
+    seed=16010504,
+):
+    """
+    Plot individual evolutionary histories with one ID per column and optional multi-parameter rows.
+
+    The layout follows the logic of ``PlotIDsColumns``:
+
+    - each column is one z=0 Subfind ID;
+    - each row is one evolutionary parameter;
+    - the title of each column is the corresponding ID;
+    - the individual history is compared with the median evolution and
+      uncertainty of Diffuse and Normal centrals;
+    - merger mass-ratio classes follow Paper I: major
+      ($\\mu_\\star\\geq1/4$), intermediate
+      ($1/10\\leq\\mu_\\star<1/4$), and minor
+      ($\\mu_\\star<1/10$);
+    - major, intermediate, and minor mergers are distinguished by line style
+      and thickness on the rows selected by ``merger_rows``;
+    - when the event-by-event merger catalogue is available, line color gives
+      the merger orientation. By default, only co-rotating, perpendicular,
+      and counter-rotating mergers are shown. The catalogue also reports the
+      number and stellar-mass contribution of each orientation.
+
+    Population reference histories are first requested through
+    ``TNG.makedataevolution``, using the same median/error construction as
+    ``PlotMedianEvolution``. If this is unavailable for a parameter, the
+    function falls back to direct medians and the requested percentile range
+    from the individual history tables.
+
+    Parameters
+    ----------
+    IDs : sequence of int, optional
+        IDs represented by the columns. If omitted, objects are selected from
+        ``PopulationName`` with the fixed random seed.
+    rows : sequence of str or sequence of sequences
+        Evolutionary parameters represented by the rows. A nested element,
+        for example ``["StarMass_Corotate_Accreted",
+        "GasMass_Corotate_Accreted", "DMMass_Corotate_Accreted"]``,
+        overplots those histories in one row. Component color, line style, and
+        line width are inferred from Type4/stars, Type0/gas, and Type1/DM.
+    MedianPopulations : sequence of str
+        Population names passed to ``TNG.makedataevolution``. The defaults
+        produce Diffuse and Normal central reference histories through
+        ``MedianColumn='Central'``.
+    median_on_grouped_rows : bool
+        If False, do not plot Diffuse/Normal median histories or uncertainty
+        bands in rows that contain more than one overplotted parameter.
+    additional_individual_lines : sequence of str or None
+        Extra individual histories to overplot on one existing row. These
+        histories are loaded for each ID but are not passed to
+        ``TNG.makedataevolution`` and therefore do not receive population
+        medians or uncertainty bands.
+    additional_individual_row : int
+        Visual row receiving the extra histories. Negative indices are
+        supported; the default ``-1`` selects the last row.
+    additional_individual_columns : sequence of int or None
+        ID-column indices in which the extra histories are drawn. None means
+        all plotted IDs.
+    additional_individual_legend_column : int or None
+        Column in the selected row that receives the legend for the extra
+        histories. If None, the first column containing those histories is
+        used.
+    compact_component_labels : bool
+        For separate co-rotating accreted-mass rows, replace the long
+        Stars/Gas/DM-specific y labels by ``component_ylabel_text`` and write
+        the component name inside the first-column panel.
+    shared_component_ylabel : bool
+        If True, use one figure-level y label centered across all detected
+        Stars/Gas/DM accreted-mass rows. If False, repeat the compact label on
+        the y axis of each such row.
+    shared_xlabel_y : float
+        Figure coordinate of the shared x label.
+    legend_bbox_to_anchor : tuple
+        Figure coordinates used to place a figure-level legend.
+    merger_rows : sequence of int or None
+        Visual row indices on which merger epochs are drawn. The default
+        ``(0,)`` keeps the event indicators only in the first row. Use None
+        to draw them on every row.
+    classify_merger_type_from_mass_ratio : bool
+        If True, classify catalogue events from ``mustar`` using the Paper-I
+        thresholds. The catalogue ``Type`` column is used only when the mass
+        ratio is unavailable.
+    entry_legend_column : int
+        Column receiving the separate entry-time legend. The index is
+        zero-based; the default 3 places it in the fourth column.
+    EntryTime : bool
+        Draw the satellite first-entry epoch as a vertical line. The snapshot
+        stored in ``entry_snap_key`` is matched to the ``Snap`` column of
+        ``SNAPS_TIME`` and converted to the same cosmic-age coordinate used by
+        the histories. Missing or non-positive entry snapshots are ignored.
+    entry_rows : sequence of int or None
+        Rows on which the entry line is drawn. None means every visual row.
+    entry_only_satellites : bool
+        If True, an entry line is drawn only for IDs identified as satellites.
+        This permits central and satellite galaxies to be mixed in the same
+        figure without placing spurious entry lines on central columns.
+    SatelliteIDs : sequence or None
+        Explicit IDs to treat as satellites. This is the most reliable option
+        for a deliberately mixed sample and takes priority over auto-detection.
+    SatellitePopulations : sequence of str or None
+        Population names whose members should be treated as satellites. If
+        omitted, likely satellite populations are inferred from
+        ``PopulationName`` (for example, DiffuseSatelliteNotInteract and
+        DiffuseSatelliteInteract when PopulationName is Diffuse or
+        DiffuseCentral).
+    satellite_flag_key : str or None
+        Optional column in the sample table explicitly indicating satellite
+        status. Common flag and rank columns are also detected automatically.
+    add_redshift_axis : bool
+        Add a secondary redshift axis above the first row.
+    redshift_axis_all_columns : bool
+        If True, reproduce the ``PlotIDsColumns`` behavior by adding a redshift
+        axis above every ID column. If False, only ``redshift_axis_column`` is
+        used.
+    redshift_hide_left_edge_after_first : bool
+        Hide the highest-redshift label at the left edge of columns after the
+        first one. This reproduces the useful ``SmallerScale`` behavior of the
+        original function and prevents labels at panel boundaries from mixing.
+    title_in_panel_with_redshift : bool
+        Place each ID title inside the top panel whenever a redshift axis is
+        present, avoiding overlap between the ID, redshift tick labels, and
+        the top-axis label.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    axs : numpy.ndarray
+        Axes with shape ``(len(rows), len(IDs))``.
+    diagnostics : pandas.DataFrame
+        Per-ID merger counts and simple size-growth diagnostics.
+    selected_ids : numpy.ndarray
+        IDs represented by the columns.
+    """
+
+    import warnings
+
+    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
+
+    # ------------------------------------------------------------------
+    # Input normalization
+    # ------------------------------------------------------------------
+    def _as_list(value):
+        if isinstance(value, (list, tuple, np.ndarray)):
+            return list(value)
+        return [value]
+
+    if rows is None:
+        raw_rows = [size_param]
+    else:
+        raw_rows = _as_list(rows)
+
+    if len(raw_rows) == 0:
+        raise ValueError("rows must contain at least one parameter.")
+
+    # Normalize every visual row to a list of one or more parameters.
+    row_groups = []
+    for row in raw_rows:
+        if isinstance(row, (list, tuple, np.ndarray)) and not isinstance(row, str):
+            parameters = [str(parameter) for parameter in list(row)]
+        else:
+            parameters = [str(row)]
+
+        if len(parameters) == 0:
+            raise ValueError("Nested rows cannot be empty.")
+
+        row_groups.append(parameters)
+
+    # Flatten without changing the order, avoiding repeated I/O.
+    flat_parameters = []
+    for parameters in row_groups:
+        for parameter in parameters:
+            if parameter not in flat_parameters:
+                flat_parameters.append(parameter)
+
+    # Normalize optional extra individual histories. They remain outside
+    # ``flat_parameters`` so they are never included in population medians.
+    if additional_individual_lines is None:
+        additional_individual_parameters = []
+    else:
+        additional_individual_parameters = [
+            str(parameter)
+            for parameter in _as_list(additional_individual_lines)
+        ]
+
+    if len(additional_individual_parameters) > 0:
+        additional_individual_row_index = int(additional_individual_row)
+        if additional_individual_row_index < 0:
+            additional_individual_row_index += len(row_groups)
+
+        if not (
+            0 <= additional_individual_row_index < len(row_groups)
+        ):
+            raise ValueError(
+                "additional_individual_row is outside the visual-row range."
+            )
+    else:
+        additional_individual_row_index = None
+
+    # Distinct defaults that remain clear beside the black individual
+    # history and the crimson/darkorange population references.
+    default_additional_colors = {
+        "StellarMassFromFlybys": "royalblue",
+        "StellarMassFromOngoingMergers": "darkviolet",
+        "StellarMassFromCompletedMergers": "forestgreen",
+        "StellarMassExSitu": "gray",
+    }
+    if additional_individual_colors is not None:
+        default_additional_colors.update(
+            dict(additional_individual_colors)
+        )
+    additional_individual_colors = default_additional_colors
+
+    default_additional_linestyles = {
+        "StellarMassFromFlybys": ":",
+        "StellarMassFromOngoingMergers": "--",
+        "StellarMassFromCompletedMergers": "-.",
+        "StellarMassExSitu": ":",
+
+    }
+    if additional_individual_linestyles is not None:
+        default_additional_linestyles.update(
+            dict(additional_individual_linestyles)
+        )
+    additional_individual_linestyles = (
+        default_additional_linestyles
+    )
+
+    default_additional_linewidths = {
+        "StellarMassFrom": 0,
+        "StellarMassFromFlybys": 0.95,
+        "StellarMassFromOngoingMergers": 1.05,
+        "StellarMassFromCompletedMergers": 1.05,
+    }
+    if additional_individual_linewidths is not None:
+        default_additional_linewidths.update(
+            dict(additional_individual_linewidths)
+        )
+    additional_individual_linewidths = (
+        default_additional_linewidths
+    )
+
+    default_additional_labels = {
+        "StellarMassFrom": "From:",
+        "StellarMassFromFlybys": "Fly-bys",
+        "StellarMassFromOngoingMergers": "Ongoing \n mergers",
+        "StellarMassFromCompletedMergers": "Completed mergers",
+        "StellarMassExSitu": "Ex-situ"
+    }
+    if additional_individual_labels is not None:
+        default_additional_labels.update(
+            dict(additional_individual_labels)
+        )
+    additional_individual_labels = default_additional_labels
+
+    median_populations = _as_list(MedianPopulations)
+    if len(median_populations) == 0:
+        MedianEvolution = False
+
+    quantiles = tuple(float(value) for value in quantiles)
+    if len(quantiles) != 2 or not (0 <= quantiles[0] < quantiles[1] <= 100):
+        raise ValueError("quantiles must be a two-element percentile pair.")
+
+    major_mass_ratio_min = float(major_mass_ratio_min)
+    intermediate_mass_ratio_min = float(intermediate_mass_ratio_min)
+
+    if not (
+        0.0 < intermediate_mass_ratio_min
+        < major_mass_ratio_min
+        <= 1.0
+    ):
+        raise ValueError(
+            "Require 0 < intermediate_mass_ratio_min "
+            "< major_mass_ratio_min <= 1."
+        )
+
+    merger_types_to_plot = tuple(
+        str(value).strip().title()
+        for value in merger_types_to_plot
+    )
+    valid_merger_types = {"Major", "Intermediate", "Minor"}
+    invalid_merger_types = (
+        set(merger_types_to_plot) - valid_merger_types
+    )
+    if invalid_merger_types:
+        raise ValueError(
+            "Unknown merger mass-ratio classes: "
+            + ", ".join(sorted(invalid_merger_types))
+        )
+
+    if merger_orientations_to_plot is None:
+        merger_orientations_to_plot = None
+    else:
+        merger_orientations_to_plot = tuple(
+            str(value).strip() for value in merger_orientations_to_plot
+        )
+        valid_orientations = {
+            "Co-rotating",
+            "Perpendicular",
+            "Counter-rotating",
+            "Other orientation",
+            "Unknown",
+        }
+        invalid_orientations = set(merger_orientations_to_plot) - valid_orientations
+        if invalid_orientations:
+            raise ValueError(
+                "Unknown merger orientations: "
+                + ", ".join(sorted(invalid_orientations))
+            )
+
+    if orientation_colors is None:
+        # These colors are intentionally distinct from the Diffuse (crimson)
+        # and Normal (darkorange) population-reference curves.
+        orientation_colors = {
+            # Co-rotating events are the key physical channel and therefore
+            # use the more visually prominent purple.
+            "Co-rotating": "darkviolet",
+            "Perpendicular": "royalblue",
+            "Counter-rotating": "forestgreen",
+            "Other orientation": "0.58",
+            "Unknown": "0.72",
+        }
+    else:
+        orientation_colors = dict(orientation_colors)
+
+    # Component styles follow the conventions already registered for
+    # Type0 (gas), Type1 (DM), and Type4 (stars). Colors preserve the
+    # legacy PlotIDsColumns convention requested for grouped rows.
+    default_component_colors = {
+        "Type4": "blue",
+        "Type0": "green",
+        "Type1": "purple",
+        "Other": individual_color,
+    }
+    if component_colors is not None:
+        default_component_colors.update(dict(component_colors))
+    component_colors = default_component_colors
+
+    default_component_line_styles = {
+        "Type4": lines("Type4"),
+        "Type0": lines("Type0"),
+        "Type1": lines("Type1"),
+        "Other": individual_linestyle,
+    }
+    if component_line_styles is not None:
+        default_component_line_styles.update(dict(component_line_styles))
+    component_line_styles = default_component_line_styles
+
+    default_component_linewidths = {
+        "Type4": linesthicker("Type4"),
+        "Type0": linesthicker("Type0"),
+        "Type1": linesthicker("Type1"),
+        "Other": 1.0,
+    }
+    if component_linewidths is not None:
+        default_component_linewidths.update(dict(component_linewidths))
+    component_linewidths = default_component_linewidths
+
+    grouped_band_alpha_scale = float(grouped_band_alpha_scale)
+    if grouped_band_alpha_scale < 0:
+        raise ValueError("grouped_band_alpha_scale must be non-negative.")
+
+    median_on_grouped_rows = bool(median_on_grouped_rows)
+
+    if merger_rows is None:
+        merger_row_indices = set(range(len(row_groups)))
+    else:
+        merger_row_indices = {
+            int(row_index)
+            for row_index in _as_list(merger_rows)
+        }
+        invalid_merger_rows = {
+            row_index
+            for row_index in merger_row_indices
+            if row_index < 0 or row_index >= len(row_groups)
+        }
+        if invalid_merger_rows:
+            raise ValueError(
+                "merger_rows contains invalid row indices: "
+                + ", ".join(str(value) for value in sorted(invalid_merger_rows))
+            )
+
+    if entry_rows is None:
+        entry_row_indices = set(range(len(row_groups)))
+    else:
+        entry_row_indices = {
+            int(row_index)
+            for row_index in _as_list(entry_rows)
+        }
+        invalid_entry_rows = {
+            row_index
+            for row_index in entry_row_indices
+            if row_index < 0 or row_index >= len(row_groups)
+        }
+        if invalid_entry_rows:
+            raise ValueError(
+                "entry_rows contains invalid row indices: "
+                + ", ".join(str(value) for value in sorted(invalid_entry_rows))
+            )
+
+    population_references_are_plotted = (
+        MedianEvolution
+        and (
+            median_on_grouped_rows
+            or any(len(parameters) == 1 for parameters in row_groups)
+        )
+    )
+
+    # ------------------------------------------------------------------
+    # Generic data helpers
+    # ------------------------------------------------------------------
+    def _as_1d_float(values):
+        arr = np.asarray(values)
+        if arr.ndim > 1:
+            arr = arr.T[0]
+        return np.asarray(arr, dtype=float).ravel()
+
+    def _extract_df(parameter):
+        try:
+            return TNG.extractDF(parameter, SIM=SIM)
+        except TypeError:
+            return TNG.extractDF(parameter)
+
+    def _extract_population(population):
+        try:
+            return TNG.extractPopulation(
+                population,
+                dfName=dfName,
+                Name=Name,
+            )
+        except TypeError:
+            return TNG.extractPopulation(
+                population,
+                dfName=dfName,
+            )
+
+    def _series_for_id(df, ID):
+        keys = [str(ID), ID]
+        try:
+            keys.insert(0, str(int(ID)))
+        except Exception:
+            pass
+
+        for key in keys:
+            try:
+                if key in df.columns:
+                    return _as_1d_float(df[key].values)
+            except Exception:
+                continue
+
+        raise KeyError(f"ID {ID} is not a column of the requested DataFrame.")
+
+    def _pad_or_trim(values, length):
+        values = _as_1d_float(values)
+        if len(values) >= length:
+            return values[:length]
+        output = np.full(length, np.nan, dtype=float)
+        output[:len(values)] = values
+        return output
+
+    def _last_finite(values):
+        values = np.asarray(values, dtype=float)
+        finite = np.where(np.isfinite(values))[0]
+        return values[finite[-1]] if len(finite) else np.nan
+
+    def _population_ids(population_df):
+        if ID_key not in population_df.columns:
+            raise KeyError(
+                f"'{ID_key}' is not present in the selected population table."
+            )
+        return np.asarray(
+            population_df[ID_key].dropna().astype(int).unique(),
+            dtype=int,
+        )
+
+    def _history_matrix(parameter_df, id_values):
+        histories = []
+        valid_ids = []
+
+        for ID in np.asarray(id_values).ravel():
+            try:
+                history = _pad_or_trim(
+                    _series_for_id(parameter_df, ID),
+                    n_time,
+                )
+            except KeyError:
+                continue
+
+            if np.isfinite(history).sum() < 2:
+                continue
+
+            histories.append(history)
+            valid_ids.append(int(ID))
+
+        if len(histories) == 0:
+            return np.empty((0, n_time), dtype=float), np.array([], dtype=int)
+
+        return np.vstack(histories), np.asarray(valid_ids, dtype=int)
+
+    def _direct_population_reference(population, parameter_df):
+        full_population_name = str(population)
+        if MedianColumn and MedianColumn not in full_population_name:
+            full_population_name = full_population_name + str(MedianColumn)
+
+        population_df = _extract_population(full_population_name)
+        population_ids = _population_ids(population_df)
+        matrix, valid_ids = _history_matrix(parameter_df, population_ids)
+
+        if matrix.shape[0] == 0:
+            empty = np.full(n_time, np.nan, dtype=float)
+            return empty, empty.copy(), empty.copy(), valid_ids
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            median = np.nanmedian(matrix, axis=0)
+            lower = np.nanpercentile(matrix, quantiles[0], axis=0)
+            upper = np.nanpercentile(matrix, quantiles[1], axis=0)
+
+        return median, lower, upper, valid_ids
+
+    def _component_token(parameter):
+        """Map a parameter name to the Type0/Type1/Type4 style family."""
+        parameter = str(parameter)
+        lower = parameter.lower()
+
+        if (
+            "Type4" in parameter
+            or ("star" in lower and "halfrad" not in lower)
+        ):
+            return "Type4"
+
+        if (
+            "Type0" in parameter
+            or (
+                "gas" in lower
+                and "_in_" not in lower
+                and "_above_" not in lower
+            )
+        ):
+            return "Type0"
+
+        if "Type1" in parameter or "dm" in lower:
+            return "Type1"
+
+        return "Other"
+
+    def _is_compact_component_parameter(parameter):
+        """Identify separate Stars/Gas/DM co-rotating accreted-mass rows."""
+        parameter = str(parameter)
+        lower = parameter.lower()
+        token = _component_token(parameter)
+
+        is_component = token in {"Type4", "Type0", "Type1"}
+        is_accreted_mass = (
+            "corotate_accreted" in lower
+            or (
+                "co" in lower
+                and "rot" in lower
+                and "acc" in lower
+                and "mass" in lower
+            )
+        )
+        return is_component and is_accreted_mass
+
+    component_row_indices = {
+        row_index
+        for row_index, parameters in enumerate(row_groups)
+        if (
+            len(parameters) == 1
+            and _is_compact_component_parameter(parameters[0])
+        )
+    }
+
+    def _parameter_style(parameter, grouped):
+        """Return color, linestyle, width multiplier, and component label."""
+        if not grouped:
+            return (
+                individual_color,
+                individual_linestyle,
+                1.0,
+                None,
+            )
+
+        token = _component_token(parameter)
+        return (
+            component_colors[token],
+            component_line_styles[token],
+            component_linewidths[token],
+            titles(token) if token != "Other" else str(parameter),
+        )
+
+    def _panel_label(parameters, row_index):
+        """Resolve an optional explicit label or derive one safely."""
+        if row_labels is not None:
+            if isinstance(row_labels, dict):
+                tuple_key = tuple(parameters)
+                if tuple_key in row_labels:
+                    return row_labels[tuple_key]
+                if len(parameters) == 1 and parameters[0] in row_labels:
+                    return row_labels[parameters[0]]
+                joined_key = "|".join(parameters)
+                if joined_key in row_labels:
+                    return row_labels[joined_key]
+            elif isinstance(row_labels, (list, tuple, np.ndarray)):
+                if row_index < len(row_labels) and row_labels[row_index] is not None:
+                    return row_labels[row_index]
+
+        if len(parameters) == 1:
+            parameter = parameters[0]
+            return labels.get(parameter, labelsequal.get(parameter, parameter))
+
+        # All grouped parameters in the requested use case represent
+        # co-rotating accreted masses. Use a compact common label when the
+        # registry does not yet contain those exact derived names.
+        if all("Mass_Corotate_Accreted" in parameter for parameter in parameters):
+            return r"$M_{\rm co\mbox{-}rot,\ acc}$"
+
+        first = parameters[0]
+        return labelsequal.get(first, labels.get(first, first))
+
+    # ------------------------------------------------------------------
+    # Merger helpers
+    # ------------------------------------------------------------------
+    def _delta_from_cumulative(cumulative):
+        """Use the reversed-difference convention already used by PlotID."""
+        cumulative = np.flip(_as_1d_float(cumulative))
+        delta = np.zeros_like(cumulative, dtype=float)
+
+        for index in range(1, len(cumulative)):
+            current = cumulative[index]
+            previous = cumulative[index - 1]
+
+            if not np.isfinite(current):
+                delta[index] = 0.0
+            elif not np.isfinite(previous):
+                delta[index] = current
+            else:
+                delta[index] = current - previous
+
+        delta = np.flip(delta)
+        delta[~np.isfinite(delta)] = 0.0
+        delta[delta < 0] = 0.0
+        return delta
+
+    def _normalized_merger_type(value):
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return None
+        value = str(value).strip().lower()
+        mapping = {
+            "major": "Major",
+            "intermediate": "Intermediate",
+            "minor": "Minor",
+        }
+        return mapping.get(value, str(value).strip().title())
+
+    def _merger_type_from_mass_ratio(value):
+        """Classify mu_star with the Paper-I 4:1 and 10:1 boundaries."""
+        try:
+            mass_ratio = float(value)
+        except Exception:
+            return None
+
+        if not np.isfinite(mass_ratio) or mass_ratio <= 0:
+            return None
+
+        # The catalogue is expected to store secondary/primary. This guard
+        # also handles accidentally inverted ratios without changing the
+        # classification.
+        if mass_ratio > 1.0:
+            mass_ratio = 1.0 / mass_ratio
+
+        if mass_ratio >= major_mass_ratio_min:
+            return "Major"
+        if mass_ratio >= intermediate_mass_ratio_min:
+            return "Intermediate"
+        return "Minor"
+
+    def _classify_orientation(angle):
+        if not np.isfinite(angle):
+            return "Unknown"
+
+        angle = float(angle)
+        if co_rotate_range[0] <= angle <= co_rotate_range[1]:
+            return "Co-rotating"
+        if perpendicular_range[0] <= angle <= perpendicular_range[1]:
+            return "Perpendicular"
+        if counter_rotate_range[0] <= angle <= counter_rotate_range[1]:
+            return "Counter-rotating"
+        return "Other orientation"
+
+    def _extract_individual_merger_catalog(ID):
+        """Read Analysis/Mergers/<ID>.csv through the project extractor."""
+        candidates = [str(int(ID)), str(int(ID)) + "s"]
+        errors = []
+
+        for candidate in candidates:
+            try:
+                try:
+                    catalogue = TNG.extractDF(candidate, MERGER=True, SIM=SIM)
+                except TypeError:
+                    catalogue = TNG.extractDF(candidate, MERGER=True)
+
+                if catalogue is not None and len(catalogue) > 0:
+                    return catalogue.copy()
+            except Exception as error:
+                errors.append(repr(error))
+
+        raise FileNotFoundError(
+            f"No individual merger catalogue was found for ID {ID}. "
+            + " | ".join(errors)
+        )
+
+    def _catalog_events_for_id(ID):
+        catalogue = _extract_individual_merger_catalog(ID)
+
+        required = {merger_snap_key}
+        missing = required.difference(catalogue.columns)
+        if missing:
+            raise KeyError(
+                f"Merger catalogue for ID {ID} is missing columns: "
+                f"{sorted(missing)}"
+            )
+
+        if (
+            merger_type_key not in catalogue.columns
+            and merger_mass_ratio_key not in catalogue.columns
+        ):
+            raise KeyError(
+                f"Merger catalogue for ID {ID} must contain either "
+                f"'{merger_type_key}' or '{merger_mass_ratio_key}'."
+            )
+
+        events = catalogue.copy()
+
+        if merger_type_key in events.columns:
+            catalogue_types = events[merger_type_key].map(
+                _normalized_merger_type
+            )
+        else:
+            catalogue_types = pd.Series(
+                None,
+                index=events.index,
+                dtype=object,
+            )
+
+        events["MergerSnap"] = pd.to_numeric(
+            events[merger_snap_key],
+            errors="coerce",
+        )
+
+        if merger_angle_key in events.columns:
+            events["MergerAngle"] = pd.to_numeric(
+                events[merger_angle_key], errors="coerce"
+            )
+        else:
+            events["MergerAngle"] = np.nan
+
+        events["Orientation"] = events["MergerAngle"].map(
+            _classify_orientation
+        )
+
+        if merger_mass_ratio_key in events.columns:
+            events["MergerMassRatio"] = pd.to_numeric(
+                events[merger_mass_ratio_key],
+                errors="coerce",
+            )
+        else:
+            events["MergerMassRatio"] = np.nan
+
+        if classify_merger_type_from_mass_ratio:
+            ratio_types = events["MergerMassRatio"].map(
+                _merger_type_from_mass_ratio
+            )
+            events["MergerType"] = ratio_types.where(
+                ratio_types.notna(),
+                catalogue_types,
+            )
+        else:
+            events["MergerType"] = catalogue_types
+            missing_type = events["MergerType"].isna()
+            if np.any(missing_type):
+                events.loc[
+                    missing_type,
+                    "MergerType",
+                ] = events.loc[
+                    missing_type,
+                    "MergerMassRatio",
+                ].map(_merger_type_from_mass_ratio)
+
+        if merger_stellar_mass_key in events.columns:
+            events["MergerLogStellarMass"] = pd.to_numeric(
+                events[merger_stellar_mass_key], errors="coerce"
+            )
+        else:
+            events["MergerLogStellarMass"] = np.nan
+
+        # Keep only rows that are actual classified mergers and have a snapshot.
+        events = events.loc[
+            events["MergerType"].notna()
+            & np.isfinite(events["MergerSnap"])
+        ].copy()
+
+        snap_to_age = {
+            int(snap): float(age)
+            for snap, age in zip(
+                time_table["Snap"].to_numpy(),
+                time_table["Age"].to_numpy(dtype=float),
+            )
+            if np.isfinite(snap) and np.isfinite(age)
+        }
+
+        events["MergerSnap"] = events["MergerSnap"].astype(int)
+        events["Age"] = events["MergerSnap"].map(snap_to_age)
+        events = events.loc[np.isfinite(events["Age"])].copy()
+        events.sort_values("Age", inplace=True)
+        events.reset_index(drop=True, inplace=True)
+        return events
+
+    def _fallback_event_arrays_for_id(ID):
+        if major_df is None or minor_df is None:
+            raise FileNotFoundError(
+                "Cumulative major/minor merger histories are unavailable."
+            )
+        major = _pad_or_trim(_series_for_id(major_df, ID), n_time)
+        minor = _pad_or_trim(_series_for_id(minor_df, ID), n_time)
+        return {
+            "major": _delta_from_cumulative(major),
+            "minor": _delta_from_cumulative(minor),
+        }
+
+    def _merger_information_for_id(ID):
+        if use_merger_catalog:
+            try:
+                return {
+                    "source": "event_catalogue",
+                    "events": _catalog_events_for_id(ID),
+                    "major": None,
+                    "minor": None,
+                }
+            except Exception as error:
+                warnings.warn(
+                    f"Could not use the merger catalogue for ID {ID} "
+                    f"({error!r}); falling back to cumulative histories."
+                )
+
+        fallback = _fallback_event_arrays_for_id(ID)
+        return {
+            "source": "cumulative_fallback",
+            "events": pd.DataFrame(),
+            "major": fallback["major"],
+            "minor": fallback["minor"],
+        }
+
+    def _event_color(orientation):
+        if not orientation_encoding:
+            return merger_color
+        return orientation_colors.get(orientation, merger_color)
+
+    def _draw_merger_lines(ax, merger_information):
+        if merger_information["source"] == "event_catalogue":
+            events = merger_information["events"]
+
+            for _, event in events.iterrows():
+                merger_type = event["MergerType"]
+                if merger_type not in merger_types_to_plot:
+                    continue
+                if merger_type == "Major" and not show_major:
+                    continue
+                if (
+                    merger_type == "Intermediate"
+                    and not show_intermediate
+                ):
+                    continue
+                if merger_type == "Minor" and not show_minor:
+                    continue
+
+                orientation = event["Orientation"]
+
+                # By default, retain only the three physically interpreted
+                # orientation classes used in the manuscript. Oblique or
+                # undefined events are omitted from the figure.
+                if merger_orientations_to_plot is not None:
+                    if orientation not in merger_orientations_to_plot:
+                        continue
+                elif (
+                    orientation in ("Other orientation", "Unknown")
+                    and not show_other_orientations
+                ):
+                    continue
+
+                if merger_type == "Major":
+                    linestyle = major_linestyle
+                    event_linewidth = (
+                        merger_linewidth
+                        * major_linewidth_factor
+                        * linewidth
+                    )
+                elif merger_type == "Intermediate":
+                    linestyle = intermediate_linestyle
+                    event_linewidth = (
+                        merger_linewidth
+                        * intermediate_linewidth_factor
+                        * linewidth
+                    )
+                else:
+                    linestyle = minor_linestyle
+                    event_linewidth = (
+                        merger_linewidth
+                        * minor_linewidth_factor
+                        * linewidth
+                    )
+
+                ax.axvline(
+                    float(event["Age"]),
+                    color=_event_color(orientation),
+                    ls=linestyle,
+                    lw=event_linewidth,
+                    alpha=merger_alpha,
+                    zorder=2,
+                )
+            return
+
+        # Legacy cumulative fallback: orientation is unavailable.
+        if show_major:
+            for index in np.where(merger_information["major"] > 0)[0]:
+                ax.axvline(
+                    time[index],
+                    color=merger_color,
+                    ls=major_linestyle,
+                    lw=(
+                        merger_linewidth
+                        * major_linewidth_factor
+                        * linewidth
+                    ),
+                    alpha=merger_alpha,
+                    zorder=2,
+                )
+
+        if show_minor:
+            for index in np.where(merger_information["minor"] > 0)[0]:
+                ax.axvline(
+                    time[index],
+                    color=merger_color,
+                    ls=minor_linestyle,
+                    lw=(
+                        merger_linewidth
+                        * minor_linewidth_factor
+                        * linewidth
+                    ),
+                    alpha=merger_alpha,
+                    zorder=2,
+                )
+
+    def _logsum_log10(log_values):
+        values = np.asarray(log_values, dtype=float)
+        values = values[np.isfinite(values)]
+        if len(values) == 0:
+            return np.nan
+        return float(np.log10(np.sum(10.0 ** values)))
+
+    def _catalogue_diagnostics(events):
+        output = {
+            "N_total_catalogue_mergers": int(len(events)),
+            "N_major_mergers": int(np.sum(events["MergerType"] == "Major")),
+            "N_intermediate_mergers": int(np.sum(events["MergerType"] == "Intermediate")),
+            "N_minor_mergers": int(np.sum(events["MergerType"] == "Minor")),
+        }
+
+        plotted = events.loc[
+            events["MergerType"].isin(merger_types_to_plot)
+        ].copy()
+
+        if merger_orientations_to_plot is not None:
+            displayed = plotted.loc[
+                plotted["Orientation"].isin(merger_orientations_to_plot)
+            ].copy()
+        elif show_other_orientations:
+            displayed = plotted.copy()
+        else:
+            displayed = plotted.loc[
+                ~plotted["Orientation"].isin(
+                    ["Other orientation", "Unknown"]
+                )
+            ].copy()
+
+        output["N_displayed_major_mergers"] = int(
+            np.sum(displayed["MergerType"] == "Major")
+        )
+        output["N_displayed_intermediate_mergers"] = int(
+            np.sum(displayed["MergerType"] == "Intermediate")
+        )
+        output["N_displayed_minor_mergers"] = int(
+            np.sum(displayed["MergerType"] == "Minor")
+        )
+        output["N_displayed_mergers"] = int(len(displayed))
+
+        orientation_map = {
+            "Co-rotating": "corotating",
+            "Perpendicular": "perpendicular",
+            "Counter-rotating": "counterrotating",
+            "Other orientation": "other_orientation",
+            "Unknown": "unknown_orientation",
+        }
+
+        for orientation, key in orientation_map.items():
+            selected = plotted.loc[plotted["Orientation"] == orientation]
+            output[f"N_{key}_mergers"] = int(len(selected))
+            output[f"logMstar_{key}_mergers"] = _logsum_log10(
+                selected["MergerLogStellarMass"].to_numpy(dtype=float)
+            )
+
+            for merger_type in (
+                "Major",
+                "Intermediate",
+                "Minor",
+            ):
+                output[
+                    f"N_{merger_type.lower()}_{key}_mergers"
+                ] = int(
+                    np.sum(selected["MergerType"] == merger_type)
+                )
+
+        return output
+
+    def _merger_indices(
+        merger_information,
+        merger_type=None,
+    ):
+        if merger_information["source"] == "event_catalogue":
+            events = merger_information["events"]
+
+            if merger_type is None:
+                selected_events = events.loc[
+                    events["MergerType"].isin(
+                        merger_types_to_plot
+                    )
+                ]
+            else:
+                selected_events = events.loc[
+                    events["MergerType"] == str(merger_type).title()
+                ]
+
+            ages = selected_events["Age"].to_numpy(dtype=float)
+
+            indices = []
+            for age in ages:
+                if np.isfinite(age):
+                    indices.append(int(np.nanargmin(np.abs(time - age))))
+            return np.unique(indices).astype(int)
+
+        if merger_type == "Major":
+            return np.where(
+                merger_information["major"] > 0
+            )[0].astype(int)
+
+        if merger_type == "Minor":
+            return np.where(
+                merger_information["minor"] > 0
+            )[0].astype(int)
+
+        if merger_type == "Intermediate":
+            return np.array([], dtype=int)
+
+        return np.unique(
+            np.concatenate([
+                np.where(merger_information["major"] > 0)[0],
+                np.where(merger_information["minor"] > 0)[0],
+            ])
+        )
+
+    def _growth_diagnostics(size, merger_indices):
+        size = np.asarray(size, dtype=float)
+        delta_size = np.diff(size)
+        valid = np.isfinite(size[:-1]) & np.isfinite(size[1:])
+
+        near_event = np.zeros(len(delta_size), dtype=bool)
+        for event_index in merger_indices:
+            low = max(0, int(event_index) - 1 - int(event_window))
+            high = min(
+                len(delta_size),
+                int(event_index) + int(event_window) + 1,
+            )
+            near_event[low:high] = True
+
+        positive = np.where(valid, np.maximum(delta_size, 0.0), 0.0)
+        total_positive = np.sum(positive)
+        positive_near = np.sum(positive[near_event])
+
+        event_steps = delta_size[valid & near_event]
+        non_event_steps = delta_size[valid & (~near_event)]
+
+        return {
+            "fraction_positive_growth_near_mergers": (
+                positive_near / total_positive if total_positive > 0 else np.nan
+            ),
+            "median_delta_size_near_mergers": (
+                np.nanmedian(event_steps) if len(event_steps) else np.nan
+            ),
+            "median_delta_size_away_from_mergers": (
+                np.nanmedian(non_event_steps) if len(non_event_steps) else np.nan
+            ),
+            "max_abs_size_step": (
+                np.nanmax(np.abs(delta_size[valid])) if np.any(valid) else np.nan
+            ),
+        }
+
+    # ------------------------------------------------------------------
+    # Axis helpers
+    # ------------------------------------------------------------------
+    def _row_ylim(parameters, row_index):
+        if ylims is not None:
+            if isinstance(ylims, dict):
+                tuple_key = tuple(parameters)
+                if tuple_key in ylims:
+                    return ylims.get(tuple_key)
+                joined_key = "|".join(parameters)
+                if joined_key in ylims:
+                    return ylims.get(joined_key)
+                if len(parameters) == 1:
+                    return ylims.get(parameters[0])
+                for parameter in parameters:
+                    if parameter in ylims:
+                        return ylims.get(parameter)
+                return None
+            if isinstance(ylims, (list, tuple, np.ndarray)):
+                if (
+                    len(ylims) == 2
+                    and np.isscalar(ylims[0])
+                    and np.isscalar(ylims[1])
+                ):
+                    return tuple(ylims)
+                if row_index < len(ylims):
+                    return tuple(ylims[row_index])
+
+        if ylim is not None and len(row_groups) == 1:
+            return tuple(ylim)
+
+        return None
+
+    def _lookback_ticks():
+        if n_columns >= 6:
+            return np.asarray([12, 8, 4, 0], dtype=float)
+        return np.asarray([14, 12, 10, 8, 6, 4, 2, 0], dtype=float)
+
+    def _format_bottom_time_axis(ax):
+        if LookBackTime:
+            present_age = np.nanmax(time)
+            lookback_values = _lookback_ticks()
+            tick_positions = present_age - lookback_values
+            valid = (
+                (tick_positions >= np.nanmin(time))
+                & (tick_positions <= np.nanmax(time))
+            )
+            tick_positions = tick_positions[valid]
+            lookback_values = lookback_values[valid]
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels([f"{value:g}" for value in lookback_values])
+            if not shared_xlabel:
+                ax.set_xlabel(
+                    r"$\mathrm{Lookback\ Time}\ [\mathrm{Gyr}]$",
+                    fontsize=fontlabel,
+                )
+        else:
+            if not shared_xlabel:
+                ax.set_xlabel(r"$t\ [\mathrm{Gyr}]$", fontsize=fontlabel)
+
+    def _add_top_redshift_axis(ax, column_index):
+        # Add a PlotIDsColumns-style redshift axis to one top-row panel.
+        if not add_redshift_axis:
+            return None
+
+        z_targets = np.asarray(redshift_values, dtype=float)
+        z_targets = z_targets[np.isfinite(z_targets)]
+        if len(z_targets) == 0:
+            return None
+
+        age_values = None
+        label_values = None
+
+        if "z" in time_table.columns:
+            valid = (
+                np.isfinite(time_table["Age"].to_numpy(dtype=float))
+                & np.isfinite(time_table["z"].to_numpy(dtype=float))
+            )
+            ages = time_table.loc[valid, "Age"].to_numpy(dtype=float)
+            redshifts = time_table.loc[valid, "z"].to_numpy(dtype=float)
+
+            if len(ages) > 0:
+                matched_ages = []
+                matched_redshifts = []
+                for target in z_targets:
+                    nearest = int(np.nanargmin(np.abs(redshifts - target)))
+                    matched_ages.append(float(ages[nearest]))
+                    matched_redshifts.append(float(target))
+
+                age_values = np.asarray(matched_ages, dtype=float)
+                label_values = np.asarray(matched_redshifts, dtype=float)
+
+        # Exact fallback used by the original PlotIDsColumns implementation.
+        if age_values is None:
+            original_z = np.asarray(
+                [0.0, 0.2, 0.5, 1.0, 2.0, 5.0, 20.0],
+                dtype=float,
+            )
+            original_age = np.asarray(
+                [13.803, 11.323, 8.587, 5.878, 3.285, 1.2, 0.0],
+                dtype=float,
+            )
+            matched_ages = []
+            matched_redshifts = []
+            for target in z_targets:
+                nearest = int(np.nanargmin(np.abs(original_z - target)))
+                matched_ages.append(float(original_age[nearest]))
+                matched_redshifts.append(float(target))
+
+            age_values = np.asarray(matched_ages, dtype=float)
+            label_values = np.asarray(matched_redshifts, dtype=float)
+
+        x_left, x_right = ax.get_xlim()
+        x_min, x_max = sorted((float(x_left), float(x_right)))
+        valid_ticks = (
+            np.isfinite(age_values)
+            & np.isfinite(label_values)
+            & (age_values >= x_min)
+            & (age_values <= x_max)
+        )
+        age_values = age_values[valid_ticks]
+        label_values = label_values[valid_ticks]
+
+        if len(age_values) == 0:
+            return None
+
+        order = np.argsort(age_values)
+        age_values = age_values[order]
+        label_values = label_values[order]
+        tick_labels = [f"{value:g}" for value in label_values]
+
+        if (
+            redshift_hide_left_edge_after_first
+            and column_index > 0
+            and len(tick_labels) > 0
+        ):
+            left_edge_index = int(np.argmin(age_values))
+            tick_labels[left_edge_index] = ""
+
+        ax2 = ax.twiny()
+        ax2.set_xlim(ax.get_xlim())
+        ax2.xaxis.set_major_locator(FixedLocator(age_values))
+        ax2.xaxis.set_major_formatter(FixedFormatter(tick_labels))
+        ax2.set_xlabel(
+            r"$z$",
+            fontsize=redshift_label_fontscale * fontlabel,
+            labelpad=redshift_label_pad,
+        )
+        ax2.tick_params(
+            axis="x",
+            which="major",
+            labelsize=redshift_tick_fontscale * multtick * fontlabel,
+            direction="in",
+            top=True,
+            bottom=False,
+            labeltop=True,
+            labelbottom=False,
+            pad=redshift_tick_pad,
+        )
+        ax2.tick_params(
+            axis="x",
+            which="minor",
+            top=False,
+            bottom=False,
+        )
+        ax2.minorticks_off()
+        ax2.grid(False)
+        ax2.patch.set_visible(False)
+        ax2.spines["bottom"].set_visible(False)
+        return ax2
+
+    # ------------------------------------------------------------------
+    # Shared time and history tables
+    # ------------------------------------------------------------------
+    try:
+        time_table = TNG.extractDF("SNAPS_TIME").copy()
+    except Exception:
+        time_table = dfTime.copy()
+
+    required_time_columns = {"Age", "Snap"}
+    if not required_time_columns.issubset(time_table.columns):
+        raise KeyError(
+            "The time table must contain at least the columns 'Age' and 'Snap'."
+        )
+
+    time = time_table["Age"].to_numpy(dtype=float)
+    n_time = len(time)
+
+    all_individual_parameters = list(flat_parameters)
+    for parameter in additional_individual_parameters:
+        if parameter not in all_individual_parameters:
+            all_individual_parameters.append(parameter)
+
+    parameter_dfs = {
+        parameter: _extract_df(parameter)
+        for parameter in all_individual_parameters
+    }
+    if size_param in parameter_dfs:
+        size_df = parameter_dfs[size_param]
+    else:
+        size_df = _extract_df(size_param)
+    major_df = None
+    minor_df = None
+    try:
+        major_df = _extract_df(major_merger_param)
+        minor_df = _extract_df(minor_merger_param)
+    except Exception as error:
+        if not use_merger_catalog:
+            raise
+        warnings.warn(
+            "Cumulative merger histories are unavailable; the function will "
+            f"rely on the event catalogues only ({error!r})."
+        )
+
+    # ------------------------------------------------------------------
+    # Resolve IDs
+    # ------------------------------------------------------------------
+    if IDs is None:
+        population_df = _extract_population(PopulationName)
+        candidates = _population_ids(population_df)
+        valid_candidates = []
+        final_sizes = []
+
+        for candidate in candidates:
+            try:
+                history = _pad_or_trim(
+                    _series_for_id(size_df, candidate),
+                    n_time,
+                )
+            except KeyError:
+                continue
+
+            if np.isfinite(history).sum() < 2:
+                continue
+
+            valid_candidates.append(int(candidate))
+            final_sizes.append(_last_finite(history))
+
+        candidates = np.asarray(valid_candidates, dtype=int)
+        final_sizes = np.asarray(final_sizes, dtype=float)
+
+        if len(candidates) == 0:
+            raise ValueError(
+                f"No valid size histories were found for {PopulationName}."
+            )
+
+        number_to_select = min(int(n_examples), len(candidates))
+
+        if selection == "random":
+            selected_ids = np.asarray(
+                rng.choice(candidates, size=number_to_select, replace=False),
+                dtype=int,
+            )
+        elif selection == "final_size":
+            order = np.argsort(final_sizes)
+            ordered_ids = candidates[order]
+            positions = np.linspace(
+                0,
+                len(ordered_ids) - 1,
+                number_to_select,
+            )
+            positions = np.unique(np.rint(positions).astype(int))
+            selected_ids = ordered_ids[positions]
+        else:
+            raise ValueError("selection must be 'random' or 'final_size'.")
+    else:
+        selected_ids = np.asarray(IDs, dtype=int).ravel()
+        if len(selected_ids) == 0:
+            raise ValueError("IDs cannot be empty.")
+
+    n_columns = len(selected_ids)
+    n_rows = len(row_groups)
+
+    if additional_individual_columns is None:
+        additional_individual_column_indices = set(range(n_columns))
+    else:
+        additional_individual_column_indices = {
+            int(column_index)
+            for column_index in _as_list(additional_individual_columns)
+        }
+        invalid_additional_columns = {
+            column_index
+            for column_index in additional_individual_column_indices
+            if column_index < 0 or column_index >= n_columns
+        }
+        if invalid_additional_columns:
+            raise ValueError(
+                "additional_individual_columns contains invalid indices: "
+                + ", ".join(
+                    str(value)
+                    for value in sorted(invalid_additional_columns)
+                )
+            )
+
+    if len(additional_individual_parameters) > 0:
+        if additional_individual_legend_column is None:
+            additional_individual_legend_column_index = min(
+                additional_individual_column_indices
+            )
+        else:
+            additional_individual_legend_column_index = int(
+                additional_individual_legend_column
+            )
+            if additional_individual_legend_column_index < 0:
+                additional_individual_legend_column_index += n_columns
+
+            if (
+                additional_individual_legend_column_index
+                not in additional_individual_column_indices
+            ):
+                # Keep the legend in a panel where the extra histories really
+                # appear, rather than silently placing it in an empty panel.
+                additional_individual_legend_column_index = min(
+                    additional_individual_column_indices
+                )
+    else:
+        additional_individual_legend_column_index = None
+
+    if redshift_axis_all_columns:
+        redshift_axis_indices = set(range(n_columns))
+    else:
+        if redshift_axis_column is None:
+            redshift_axis_indices = set()
+        else:
+            redshift_axis_indices = {int(redshift_axis_column)}
+
+    invalid_redshift_columns = {
+        column_index
+        for column_index in redshift_axis_indices
+        if column_index < 0 or column_index >= n_columns
+    }
+    if invalid_redshift_columns:
+        raise ValueError(
+            "Invalid redshift-axis column indices: "
+            + ", ".join(
+                str(value)
+                for value in sorted(invalid_redshift_columns)
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Satellite classification and entry-time lookup
+    # ------------------------------------------------------------------
+    def _extract_ids_from_population_result(population_result):
+        """Return integer IDs from a population DataFrame or array-like."""
+        if population_result is None:
+            return set()
+
+        if isinstance(population_result, pd.DataFrame):
+            for candidate in (ID_key, "SubfindID_99", "SubfindID"):
+                if candidate in population_result.columns:
+                    values = pd.to_numeric(
+                        population_result[candidate],
+                        errors="coerce",
+                    ).dropna()
+                    return set(values.astype(int).tolist())
+            return set()
+
+        try:
+            values = pd.to_numeric(
+                pd.Series(np.asarray(population_result).ravel()),
+                errors="coerce",
+            ).dropna()
+            return set(values.astype(int).tolist())
+        except Exception:
+            return set()
+
+    def _base_population_name(name):
+        """Strip environment suffixes while preserving the size class."""
+        base = str(name)
+        suffixes = (
+            "SatelliteNotInteract",
+            "SatelliteInteract",
+            "Satellite",
+            "Central",
+        )
+        for suffix in suffixes:
+            if base.endswith(suffix):
+                base = base[:-len(suffix)]
+                break
+        return base
+
+    if SatellitePopulations is None:
+        base_population = _base_population_name(PopulationName)
+        inferred_satellite_populations = []
+
+        # If the supplied population already names satellites, try it first.
+        if "Satellite" in str(PopulationName):
+            inferred_satellite_populations.append(str(PopulationName))
+
+        if base_population:
+            inferred_satellite_populations.extend([
+                base_population + "SatelliteNotInteract",
+                base_population + "SatelliteInteract",
+                base_population + "Satellite",
+            ])
+
+        # Preserve order while removing duplicate names.
+        satellite_population_names = list(dict.fromkeys(
+            inferred_satellite_populations
+        ))
+    else:
+        satellite_population_names = [
+            str(value)
+            for value in _as_list(SatellitePopulations)
+        ]
+
+    explicit_satellite_ids = set()
+    if SatelliteIDs is not None:
+        explicit_satellite_ids = {
+            int(value)
+            for value in np.asarray(SatelliteIDs).ravel()
+            if pd.notna(value)
+        }
+
+    population_satellite_ids = set()
+    if EntryTime and entry_only_satellites:
+        for satellite_population in satellite_population_names:
+            try:
+                population_result = _extract_population(
+                    satellite_population
+                )
+            except Exception:
+                continue
+
+            population_satellite_ids.update(
+                _extract_ids_from_population_result(
+                    population_result
+                )
+            )
+
+    # Build one lookup table from every available source, with the complete
+    # dfName sample attempted first. This is important when IDs from central
+    # and satellite sub-populations are mixed in one call.
+    entry_frames = []
+    if EntryTime:
+        entry_population_candidates = [
+            dfName,
+            PopulationName,
+            *satellite_population_names,
+        ]
+
+        for entry_population in dict.fromkeys(
+            str(value) for value in entry_population_candidates
+        ):
+            try:
+                candidate_sample = _extract_population(entry_population)
+            except Exception:
+                continue
+
+            if not isinstance(candidate_sample, pd.DataFrame):
+                continue
+            if entry_snap_key not in candidate_sample.columns:
+                continue
+
+            id_column = None
+            for candidate in (ID_key, "SubfindID_99", "SubfindID"):
+                if candidate in candidate_sample.columns:
+                    id_column = candidate
+                    break
+
+            if id_column is None:
+                continue
+
+            frame = candidate_sample.copy()
+            frame["_EntryLookupID"] = pd.to_numeric(
+                frame[id_column],
+                errors="coerce",
+            )
+            frame["_EntrySourcePopulation"] = entry_population
+            entry_frames.append(frame)
+
+    if entry_frames:
+        entry_sample = pd.concat(
+            entry_frames,
+            ignore_index=True,
+            sort=False,
+        )
+        entry_sample = entry_sample.loc[
+            np.isfinite(entry_sample["_EntryLookupID"])
+        ].copy()
+        entry_sample["_EntryLookupID"] = (
+            entry_sample["_EntryLookupID"].astype(int)
+        )
+        entry_sample = entry_sample.drop_duplicates(
+            subset=["_EntryLookupID"],
+            keep="first",
+        )
+    else:
+        entry_sample = None
+
+    if EntryTime and entry_sample is None:
+        warnings.warn(
+            "EntryTime=True, but no population table containing both "
+            f"'{entry_snap_key}' and an ID column was found. "
+            "Entry lines will be omitted."
+        )
+
+    def _bool_like(value):
+        """Convert common boolean/string/numeric flags to bool or None."""
+        if value is None or pd.isna(value):
+            return None
+
+        if isinstance(value, (bool, np.bool_)):
+            return bool(value)
+
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {
+                "satellite", "sat", "true", "yes", "y", "1"
+            }:
+                return True
+            if normalized in {
+                "central", "cen", "false", "no", "n", "0"
+            }:
+                return False
+            return None
+
+        try:
+            return bool(float(value) > 0)
+        except Exception:
+            return None
+
+    def _entry_row_for_id(ID):
+        if entry_sample is None:
+            return None
+
+        selected = entry_sample.loc[
+            entry_sample["_EntryLookupID"] == int(ID)
+        ]
+        if len(selected) == 0:
+            return None
+        return selected.iloc[0]
+
+    def _is_satellite_for_entry(ID):
+        """Classify one plotted ID for the purpose of drawing entry time."""
+        if not entry_only_satellites:
+            return True, "entry_only_satellites=False"
+
+        ID = int(ID)
+
+        # Explicit IDs are authoritative.
+        if SatelliteIDs is not None:
+            return (
+                ID in explicit_satellite_ids,
+                "SatelliteIDs",
+            )
+
+        # Membership in one of the satellite populations is next.
+        if ID in population_satellite_ids:
+            return True, "SatellitePopulations"
+
+        row = _entry_row_for_id(ID)
+        if row is not None:
+            # User-supplied flag.
+            if (
+                satellite_flag_key is not None
+                and satellite_flag_key in row.index
+            ):
+                flag = _bool_like(row[satellite_flag_key])
+                if flag is not None:
+                    return flag, satellite_flag_key
+
+            # Common direct satellite flags.
+            for candidate in (
+                "IsSatellite",
+                "isSatellite",
+                "Satellite",
+                "Satellite_99",
+            ):
+                if candidate in row.index:
+                    flag = _bool_like(row[candidate])
+                    if flag is not None:
+                        return flag, candidate
+
+            # Common central flags: invert their value.
+            for candidate in (
+                "IsCentral",
+                "isCentral",
+                "Central",
+                "Central_99",
+            ):
+                if candidate in row.index:
+                    flag = _bool_like(row[candidate])
+                    if flag is not None:
+                        return (not flag), candidate
+
+            # A non-zero rank inside the FoF group generally indicates a
+            # satellite, while rank zero indicates the central.
+            for candidate in (
+                "SubhaloRankInGr",
+                "SubhaloRankInGroup",
+                "RankInGroup",
+            ):
+                if candidate in row.index:
+                    rank = pd.to_numeric(
+                        pd.Series([row[candidate]]),
+                        errors="coerce",
+                    ).iloc[0]
+                    if np.isfinite(rank):
+                        return bool(rank > 0), candidate
+
+        # PopulationName remains a safe final clue only when it explicitly
+        # names one environment. For a mixed/general name, unknown IDs are
+        # conservatively treated as non-satellites.
+        population_name = str(PopulationName)
+        if "Satellite" in population_name:
+            return True, "PopulationName"
+        if "Central" in population_name:
+            return False, "PopulationName"
+
+        return False, "unknown-skipped"
+
+    def _entry_event_for_id(ID, is_satellite):
+        if (
+            not EntryTime
+            or entry_sample is None
+            or (entry_only_satellites and not is_satellite)
+        ):
+            return np.nan, np.nan
+
+        row = _entry_row_for_id(ID)
+        if row is None:
+            return np.nan, np.nan
+
+        entry_snap_values = pd.to_numeric(
+            pd.Series([row.get(entry_snap_key, np.nan)]),
+            errors="coerce",
+        ).dropna()
+        if len(entry_snap_values) == 0:
+            return np.nan, np.nan
+
+        entry_snap = float(entry_snap_values.iloc[0])
+        if not np.isfinite(entry_snap) or entry_snap <= 0:
+            return np.nan, np.nan
+
+        snap_values = pd.to_numeric(
+            time_table["Snap"],
+            errors="coerce",
+        ).to_numpy(dtype=float)
+        age_values = pd.to_numeric(
+            time_table["Age"],
+            errors="coerce",
+        ).to_numpy(dtype=float)
+
+        valid = np.isfinite(snap_values) & np.isfinite(age_values)
+        if not np.any(valid):
+            return entry_snap, np.nan
+
+        valid_indices = np.where(valid)[0]
+        nearest_local = int(
+            np.nanargmin(
+                np.abs(snap_values[valid] - entry_snap)
+            )
+        )
+        nearest_index = int(valid_indices[nearest_local])
+        return entry_snap, float(age_values[nearest_index])
+
+    # ------------------------------------------------------------------
+    # Population medians and uncertainties
+    # ------------------------------------------------------------------
+    median_references = {parameter: {} for parameter in flat_parameters}
+    reference_method = "disabled"
+
+    if MedianEvolution:
+        project_loaded = False
+
+        try:
+            reference_data, reference_error = TNG.makedataevolution(
+                median_populations,
+                [MedianColumn],
+                flat_parameters,
+                SampleName=SampleName,
+                dfName=dfName,
+                Name=Name,
+                nboots=nboots,
+            )
+
+            for parameter_index, parameter in enumerate(flat_parameters):
+                for population_index, population in enumerate(median_populations):
+                    median = _pad_or_trim(
+                        reference_data[parameter_index][0][population_index],
+                        n_time,
+                    )
+                    error = _pad_or_trim(
+                        reference_error[parameter_index][0][population_index],
+                        n_time,
+                    )
+                    median_references[parameter][str(population)] = {
+                        "median": median,
+                        "lower": median - error,
+                        "upper": median + error,
+                        "method": "makedataevolution",
+                    }
+
+            project_loaded = True
+            reference_method = "makedataevolution"
+
+        except Exception as error:
+            warnings.warn(
+                "Could not load the population references with "
+                f"TNG.makedataevolution ({error!r}); using direct histories."
+            )
+
+        if not project_loaded:
+            reference_method = "direct_percentiles"
+            for parameter in flat_parameters:
+                for population in median_populations:
+                    median, lower, upper, valid_ids = _direct_population_reference(
+                        population,
+                        parameter_dfs[parameter],
+                    )
+                    median_references[parameter][str(population)] = {
+                        "median": median,
+                        "lower": lower,
+                        "upper": upper,
+                        "valid_ids": valid_ids,
+                        "method": "direct_percentiles",
+                    }
+
+    # ------------------------------------------------------------------
+    # Figure setup
+    # ------------------------------------------------------------------
+    fig = plt.figure(figsize=(cNum * n_columns, lNum * n_rows))
+    gs = fig.add_gridspec(
+        n_rows,
+        n_columns,
+        hspace=hspace,
+        wspace=wspace,
+    )
+    axs = gs.subplots(sharex="col", sharey="row", squeeze=False)
+
+    diagnostics_rows = []
+
+    # ------------------------------------------------------------------
+    # Draw panels
+    # ------------------------------------------------------------------
+    catalogue_used_any = False
+    entry_used_any = False
+
+    for column_index, ID in enumerate(selected_ids):
+        try:
+            merger_information = _merger_information_for_id(ID)
+        except Exception as error:
+            warnings.warn(str(error))
+            merger_information = {
+                "source": "unavailable",
+                "events": pd.DataFrame(),
+                "major": np.zeros(n_time, dtype=float),
+                "minor": np.zeros(n_time, dtype=float),
+            }
+
+        if merger_information["source"] == "event_catalogue":
+            catalogue_used_any = True
+
+        is_satellite_for_entry, satellite_detection_source = (
+            _is_satellite_for_entry(ID)
+        )
+        entry_snap, entry_age = _entry_event_for_id(
+            ID,
+            is_satellite_for_entry,
+        )
+        entry_line_shown = bool(
+            is_satellite_for_entry
+            and np.isfinite(entry_age)
+        )
+        if entry_line_shown:
+            entry_used_any = True
+
+        plotted_histories = {}
+
+        for row_index, parameters in enumerate(row_groups):
+            ax = axs[row_index, column_index]
+            grouped = len(parameters) > 1
+
+            # Population bands and medians. In grouped rows, population is
+            # still encoded by color (Diffuse/Normal), while the physical
+            # component is encoded by the Type0/Type1/Type4 linestyle.
+            if (
+                MedianEvolution
+                and (median_on_grouped_rows or not grouped)
+            ):
+                for parameter in parameters:
+                    _, parameter_ls, parameter_lw, _ = _parameter_style(
+                        parameter,
+                        grouped=True,
+                    )
+
+                    for population in median_populations:
+                        reference = median_references[parameter].get(
+                            str(population)
+                        )
+                        if reference is None:
+                            continue
+
+                        median = reference["median"]
+                        lower = reference["lower"]
+                        upper = reference["upper"]
+                        valid_median = np.isfinite(time) & np.isfinite(median)
+
+                        if QuantileError:
+                            valid_band = (
+                                valid_median
+                                & np.isfinite(lower)
+                                & np.isfinite(upper)
+                            )
+                            band_alpha = alphaShade
+                            if grouped:
+                                band_alpha *= grouped_band_alpha_scale
+
+                            ax.fill_between(
+                                time[valid_band],
+                                lower[valid_band],
+                                upper[valid_band],
+                                color=colors(str(population) + "Error"),
+                                alpha=band_alpha,
+                                linewidth=0,
+                                zorder=0,
+                            )
+
+                        ax.plot(
+                            time[valid_median],
+                            median[valid_median],
+                            color=colors(str(population)),
+                            ls=(parameter_ls if grouped else lines(str(population))),
+                            lw=(
+                                median_linewidth
+                                * linewidth
+                                * (parameter_lw if grouped else 1.0)
+                            ),
+                            alpha=0.95,
+                            dash_capstyle=capstyles(
+                                _component_token(parameter)
+                                if grouped else str(population)
+                            ),
+                            zorder=1,
+                        )
+
+            # Keep merger epochs only on the requested visual rows.
+            if row_index in merger_row_indices:
+                _draw_merger_lines(ax, merger_information)
+
+            if (
+                EntryTime
+                and entry_line_shown
+                and row_index in entry_row_indices
+                and np.isfinite(entry_age)
+            ):
+                ax.axvline(
+                    entry_age,
+                    color=entry_color,
+                    ls=entry_linestyle,
+                    lw=entry_linewidth * linewidth,
+                    alpha=entry_alpha,
+                    zorder=2.4,
+                )
+
+            # One or several individual histories in the current visual row.
+            for parameter in parameters:
+                try:
+                    values = _pad_or_trim(
+                        _series_for_id(parameter_dfs[parameter], ID),
+                        n_time,
+                    )
+                except KeyError as error:
+                    warnings.warn(str(error))
+                    values = np.full(n_time, np.nan, dtype=float)
+
+                plotted_histories[parameter] = values
+
+                color, linestyle, width_multiplier, _ = _parameter_style(
+                    parameter,
+                    grouped=grouped,
+                )
+
+                finite = np.isfinite(values) & np.isfinite(time)
+                if np.sum(finite) >= 2:
+                    ax.plot(
+                        time[finite],
+                        values[finite],
+                        color=color,
+                        ls=linestyle,
+                        lw=(
+                            linewidth
+                            * individual_linewidth_factor
+                            * width_multiplier
+                        ),
+                        alpha=alpha_line,
+                        dash_capstyle=capstyles(_component_token(parameter)),
+                        zorder=4,
+                    )
+
+            # Optional source decomposition overplotted on one existing
+            # row. These histories are intentionally independent of ``rows``:
+            # the principal parameter retains its population medians, while
+            # the source contributions remain purely individual.
+            if (
+                len(additional_individual_parameters) > 0
+                and row_index == additional_individual_row_index
+                and column_index in additional_individual_column_indices
+            ):
+                for extra_parameter in additional_individual_parameters:
+                    try:
+                        extra_values = _pad_or_trim(
+                            _series_for_id(
+                                parameter_dfs[extra_parameter],
+                                ID,
+                            ),
+                            n_time,
+                        )
+                    except KeyError as error:
+                        warnings.warn(str(error))
+                        extra_values = np.full(
+                            n_time,
+                            np.nan,
+                            dtype=float,
+                        )
+
+                    plotted_histories[extra_parameter] = extra_values
+
+                    finite_extra = (
+                        np.isfinite(extra_values)
+                        & np.isfinite(time)
+                    )
+                    if np.sum(finite_extra) >= 2:
+                        ax.plot(
+                            time[finite_extra],
+                            extra_values[finite_extra],
+                            color=additional_individual_colors.get(
+                                extra_parameter,
+                                "0.35",
+                            ),
+                            ls=additional_individual_linestyles.get(
+                                extra_parameter,
+                                "-",
+                            ),
+                            lw=(
+                                linewidth
+                                * additional_individual_linewidths.get(
+                                    extra_parameter,
+                                    1.0,
+                                )
+                            ),
+                            alpha=additional_individual_alpha,
+                            zorder=additional_individual_zorder,
+                        )
+
+            row_limit = _row_ylim(parameters, row_index)
+            if row_limit is not None:
+                ax.set_ylim(*row_limit)
+
+            row_scales = [scales(parameter) for parameter in parameters]
+            row_scale = row_scales[0]
+            if any(scale != row_scale for scale in row_scales[1:]):
+                warnings.warn(
+                    "Parameters overplotted in row "
+                    f"{row_index} have different registered scales "
+                    f"{row_scales}; using '{row_scale}'."
+                )
+
+            ax.set_yscale(row_scale)
+            if row_scale in ("log", "symlog"):
+                ax.yaxis.set_major_formatter(
+                    FuncFormatter(format_func_loglog)
+                )
+
+            if GridMake:
+                ax.grid(
+                    True,
+                    color="#9e9e9e",
+                    which="major",
+                    linewidth=0.6,
+                    alpha=0.3,
+                    linestyle=":",
+                )
+
+            # Never draw primary-axis top labels/ticks.
+            ax.tick_params(
+                axis="both",
+                which="both",
+                direction="in",
+                right=True,
+                top=False,
+                labeltop=False,
+                labelsize=multtick * fontlabel,
+            )
+
+            if column_index == 0:
+                is_compact_component_row = (
+                    compact_component_labels
+                    and row_index in component_row_indices
+                )
+
+                if is_compact_component_row:
+                    if shared_component_ylabel:
+                        ax.set_ylabel("")
+                    else:
+                        ax.set_ylabel(
+                            component_ylabel_text,
+                            fontsize=fontlabel,
+                        )
+
+                    if component_text_in_first_column:
+                        component_token = _component_token(parameters[0])
+                        ax.text(
+                            component_text_position[0],
+                            component_text_position[1],
+                            titles(component_token),
+                            transform=ax.transAxes,
+                            ha="left",
+                            va="top",
+                            fontsize=component_text_fontscale * fontlabel,
+                            bbox={
+                                "boxstyle": "square,pad=0.16",
+                                "facecolor": "white",
+                                "edgecolor": "none",
+                                "alpha": component_text_bbox_alpha,
+                            },
+                            zorder=20,
+                        )
+                else:
+                    ax.set_ylabel(
+                        _panel_label(parameters, row_index),
+                        fontsize=fontlabel,
+                    )
+
+            if row_index == 0:
+                title_text = (
+                    f"{title_prefix} {int(ID)}"
+                    if title_prefix
+                    else f"{int(ID)}"
+                )
+                if ADD_CentSat != None:
+                    title_text= title_text + f' {ADD_CentSat[column_index]}'
+                column_has_redshift = (
+                    add_redshift_axis
+                    and column_index in redshift_axis_indices
+                )
+
+                if (
+                    column_has_redshift
+                    and title_in_panel_with_redshift
+                ):
+                    ax.text(
+                        title_in_panel_position[0],
+                        title_in_panel_position[1],
+                        title_text,
+                        transform=ax.transAxes,
+                        ha="left",
+                        va="top",
+                        fontsize=0.92 * fontlabel,
+                        bbox={
+                            "boxstyle": "square,pad=0.14",
+                            "facecolor": "white",
+                            "edgecolor": "none",
+                            "alpha": title_in_panel_bbox_alpha,
+                        },
+                        zorder=21,
+                    )
+                else:
+                    ax.set_title(
+                        title_text,
+                        fontsize=0.92 * fontlabel,
+                        pad=title_pad,
+                    )
+
+            if row_index == n_rows - 1:
+                _format_bottom_time_axis(ax)
+
+            if xlim is not None:
+                ax.set_xlim(*xlim)
+            else:
+                ax.set_xlim(np.nanmin(time), np.nanmax(time))
+
+        if (
+            add_redshift_axis
+            and column_index in redshift_axis_indices
+        ):
+            _add_top_redshift_axis(
+                axs[0, column_index],
+                column_index,
+            )
+
+        size_values = plotted_histories.get(size_param)
+        if size_values is None:
+            size_values = plotted_histories.get(row_groups[0][0])
+
+        merger_indices = _merger_indices(merger_information)
+
+        diagnostic_row = {
+            "SubfindID_99": int(ID),
+            "Population": PopulationName,
+            "MergerSource": merger_information["source"],
+            "MedianReferenceMethod": reference_method,
+            "IsSatelliteForEntry": bool(is_satellite_for_entry),
+            "SatelliteDetectionSource": satellite_detection_source,
+            "EntryLineShown": bool(entry_line_shown),
+            "EntrySnap": entry_snap,
+            "EntryAge_Gyr": entry_age,
+            "EntryLookbackTime_Gyr": (
+                float(np.nanmax(time) - entry_age)
+                if np.isfinite(entry_age)
+                else np.nan
+            ),
+        }
+
+        if merger_information["source"] == "event_catalogue":
+            diagnostic_row.update(
+                _catalogue_diagnostics(merger_information["events"])
+            )
+        else:
+            major_values = merger_information.get("major")
+            minor_values = merger_information.get("minor")
+            diagnostic_row.update({
+                "N_major_mergers": int(np.nansum(major_values))
+                    if major_values is not None else 0,
+                "N_minor_mergers": int(np.nansum(minor_values))
+                    if minor_values is not None else 0,
+                "N_intermediate_mergers": np.nan,
+                "N_corotating_mergers": np.nan,
+                "N_perpendicular_mergers": np.nan,
+                "N_counterrotating_mergers": np.nan,
+                "N_other_orientation_mergers": np.nan,
+            })
+
+        if size_values is not None:
+            diagnostic_row["final_size"] = _last_finite(size_values)
+            diagnostic_row.update(
+                _growth_diagnostics(size_values, merger_indices)
+            )
+
+            for merger_class in (
+                "Major",
+                "Intermediate",
+                "Minor",
+            ):
+                class_indices = _merger_indices(
+                    merger_information,
+                    merger_type=merger_class,
+                )
+
+                if len(class_indices) > 0:
+                    class_growth = _growth_diagnostics(
+                        size_values,
+                        class_indices,
+                    )
+                    class_key = merger_class.lower()
+                    diagnostic_row[
+                        "fraction_positive_growth_near_"
+                        f"{class_key}_mergers"
+                    ] = class_growth[
+                        "fraction_positive_growth_near_mergers"
+                    ]
+                    diagnostic_row[
+                        "median_delta_size_near_"
+                        f"{class_key}_mergers"
+                    ] = class_growth[
+                        "median_delta_size_near_mergers"
+                    ]
+                else:
+                    class_key = merger_class.lower()
+                    diagnostic_row[
+                        "fraction_positive_growth_near_"
+                        f"{class_key}_mergers"
+                    ] = np.nan
+                    diagnostic_row[
+                        "median_delta_size_near_"
+                        f"{class_key}_mergers"
+                    ] = np.nan
+
+        for parameter in all_individual_parameters:
+            diagnostic_row[f"final_{parameter}"] = _last_finite(
+                plotted_histories.get(
+                    parameter,
+                    np.full(n_time, np.nan, dtype=float),
+                )
+            )
+
+        diagnostics_rows.append(diagnostic_row)
+
+        annotation_lines = []
+        if annotate_counts:
+            annotation_lines.append(
+                rf"$M/I/m="
+                rf"{diagnostic_row.get('N_displayed_major_mergers', diagnostic_row.get('N_major_mergers', 0))}/"
+                rf"{diagnostic_row.get('N_displayed_intermediate_mergers', diagnostic_row.get('N_intermediate_mergers', 0))}/"
+                rf"{diagnostic_row.get('N_displayed_minor_mergers', diagnostic_row.get('N_minor_mergers', 0))}$"
+            )
+
+        if (
+            annotate_orientation_counts
+            and merger_information["source"] == "event_catalogue"
+        ):
+            annotation_lines.append(
+                rf"$C/P/CR="
+                rf"{diagnostic_row.get('N_corotating_mergers', 0)}/"
+                rf"{diagnostic_row.get('N_perpendicular_mergers', 0)}/"
+                rf"{diagnostic_row.get('N_counterrotating_mergers', 0)}$"
+            )
+
+        if annotation_lines:
+            axs[0, column_index].text(
+                annotation_position[0],
+                annotation_position[1],
+                "\n".join(annotation_lines),
+                transform=axs[0, column_index].transAxes,
+                ha="right",
+                va="top",
+                fontsize=annotation_fontscale * fontlabel,
+                bbox={
+                    "boxstyle": "square,pad=0.15",
+                    "facecolor": "white",
+                    "edgecolor": "none",
+                    "alpha": 0.72,
+                },
+                zorder=20,
+            )
+
+    # ------------------------------------------------------------------
+    # Shared xlabel and legend
+    # ------------------------------------------------------------------
+    if shared_xlabel:
+        if LookBackTime:
+            fig.supxlabel(
+                r"$\mathrm{Lookback\ Time}\ [\mathrm{Gyr}]$",
+                fontsize=fontlabel,
+                y=shared_xlabel_y,
+            )
+        else:
+            fig.supxlabel(
+                r"$t\ [\mathrm{Gyr}]$",
+                fontsize=fontlabel,
+                y=shared_xlabel_y,
+            )
+
+    if legend:
+        legend_handles = []
+        orientation_handles = []
+        if show_component_legend and any(
+            len(parameters) > 1 for parameters in row_groups
+        ):
+            component_order = ["Type4", "Type0", "Type1"]
+            used_tokens = {
+                _component_token(parameter)
+                for parameters in row_groups
+                if len(parameters) > 1
+                for parameter in parameters
+            }
+            for token in component_order:
+                if token not in used_tokens:
+                    continue
+                legend_handles.append(
+                    Line2D(
+                        [0], [0],
+                        color=component_colors[token],
+                        ls=component_line_styles[token],
+                        lw=linewidth * component_linewidths[token],
+                        label=titles(token),
+                    )
+                )
+
+
+
+        # Entry time receives its own local legend below, so it does not
+        # compete with merger mass-ratio entries in the first column.
+
+        # Linestyle encodes merger mass-ratio class.
+        neutral_merger_color = "0.25" if orientation_encoding else merger_color
+
+        if merger_row_indices and show_major:
+            legend_handles.append(
+                Line2D(
+                    [0], [0],
+                    color=neutral_merger_color,
+                    ls=major_linestyle,
+                    lw=(
+                        merger_linewidth
+                        * major_linewidth_factor
+                        * linewidth
+                    ),
+                    alpha=max(merger_alpha, 0.75),
+                    label="Major merger",
+                )
+            )
+
+        if merger_row_indices and show_intermediate:
+            legend_handles.append(
+                Line2D(
+                    [0], [0],
+                    color=neutral_merger_color,
+                    ls=intermediate_linestyle,
+                    lw=(
+                        merger_linewidth
+                        * intermediate_linewidth_factor
+                        * linewidth
+                    ),
+                    alpha=max(merger_alpha, 0.75),
+                    label="Intermediate merger",
+                )
+            )
+
+        if merger_row_indices and show_minor:
+            legend_handles.append(
+                Line2D(
+                    [0], [0],
+                    color=neutral_merger_color,
+                    ls=minor_linestyle,
+                    lw=(
+                        merger_linewidth
+                        * minor_linewidth_factor
+                        * linewidth
+                    ),
+                    alpha=max(merger_alpha, 0.75),
+                    label="Minor merger",
+                )
+            )
+
+        # Color independently encodes angular-momentum orientation.
+        if orientation_encoding and catalogue_used_any:
+            if merger_orientations_to_plot is None:
+                orientation_order = [
+                    "Co-rotating",
+                    "Perpendicular",
+                    "Counter-rotating",
+                ]
+                if show_other_orientations:
+                    orientation_order.append("Other orientation")
+            else:
+                orientation_order = list(merger_orientations_to_plot)
+
+            for orientation in orientation_order:
+                orientation_handles.append(
+                    Line2D(
+                        [0], [0],
+                        color=orientation_colors[orientation],
+                        ls="-",
+                        lw=(
+                            merger_linewidth
+                            * intermediate_linewidth_factor
+                            * linewidth
+                        ),
+                        label=orientation,
+                    )
+                )
+
+        legend_kwargs = dict(
+            handles=legend_handles,
+            fontsize=0.68 * fontlabel,
+            framealpha=framealpha,
+            ncol=legend_ncol,
+            handlelength=2.0,
+            handletextpad=0.45,
+            columnspacing=0.75,
+            labelspacing=0.22,
+            borderpad=0.35,
+        )
+        
+        orientation_kwargs = dict(
+            handles=orientation_handles,
+            fontsize=0.68 * fontlabel,
+            framealpha=framealpha,
+            ncol=legend_ncol,
+            handlelength=2.0,
+            handletextpad=0.45,
+            columnspacing=0.75,
+            labelspacing=0.22,
+            borderpad=0.35,
+        )
+
+
+        if legend_on_figure:
+            fig.legend(
+                loc="upper center",
+                bbox_to_anchor=legend_bbox_to_anchor,
+                borderaxespad=legend_borderaxespad,
+                **legend_kwargs,
+            )
+        else:
+            axs[0, 0].legend(
+                loc=legend_loc,
+                **legend_kwargs,
+            )
+
+            if n_columns > 1 and len(orientation_handles) > 0:
+                axs[0, 1].legend(
+                    loc=legend_loc,
+                    **orientation_kwargs,
+                )
+
+        # Entry time always receives a dedicated local legend, including when
+        # the mass-ratio legend itself is figure-level.
+        if EntryTime and entry_used_any:
+            resolved_entry_legend_column = int(
+                entry_legend_column
+            )
+            if resolved_entry_legend_column < 0:
+                resolved_entry_legend_column += n_columns
+
+            if not (
+                0 <= resolved_entry_legend_column < n_columns
+            ):
+                resolved_entry_legend_column = min(
+                    3,
+                    n_columns - 1,
+                )
+
+            entry_axis = axs[
+                0,
+                resolved_entry_legend_column,
+            ]
+            existing_entry_axis_legend = entry_axis.get_legend()
+            if existing_entry_axis_legend is not None:
+                entry_axis.add_artist(
+                    existing_entry_axis_legend
+                )
+
+            entry_axis.legend(
+                handles=[
+                    Line2D(
+                        [0], [0],
+                        color=entry_color,
+                        ls=entry_linestyle,
+                        lw=entry_linewidth * linewidth,
+                        alpha=entry_alpha,
+                        label=entry_label,
+                    )
+                ],
+                loc=entry_legend_loc,
+                fontsize=entry_legend_fontscale * fontlabel,
+                framealpha=framealpha,
+                ncol=1,
+                handlelength=2.0,
+                handletextpad=0.45,
+                labelspacing=0.22,
+                borderpad=0.35,
+            )
+
+        # A third, local legend is placed in the same visual row in which
+        # flyby/ongoing/completed-merger histories are shown. This preserves
+        # the user's split top-row legends and avoids adding more entries there.
+        if (
+            show_additional_individual_legend
+            and len(additional_individual_parameters) > 0
+            and additional_individual_row_index is not None
+            and additional_individual_legend_column_index is not None
+        ):
+            additional_handles = [
+                Line2D(
+                    [0], [0],
+                    color=additional_individual_colors.get(
+                        parameter,
+                        "0.35",
+                    ),
+                    ls=additional_individual_linestyles.get(
+                        parameter,
+                        "-",
+                    ),
+                    lw=(
+                        linewidth
+                        * additional_individual_linewidths.get(
+                            parameter,
+                            1.0,
+                        )
+                    ),
+                    alpha=additional_individual_alpha,
+                    label=additional_individual_labels.get(
+                        parameter,
+                        parameter,
+                    ),
+                )
+                for parameter in np.append("StellarMassFrom", additional_individual_parameters)
+            ]
+
+            axs[
+                additional_individual_row_index,
+                additional_individual_legend_column_index,
+            ].legend(
+                handles=additional_handles,
+                loc=additional_individual_legend_loc,
+                fontsize=(
+                    additional_individual_legend_fontscale
+                    * fontlabel
+                ),
+                framealpha=framealpha,
+                ncol=additional_individual_legend_ncol,
+                handlelength=2.0,
+                handletextpad=0.45,
+                columnspacing=0.75,
+                labelspacing=0.22,
+                borderpad=0.35,
+            )
+
+
+    if figure_top_margin is None:
+        if legend and legend_on_figure:
+            top_margin = 0.905 if not add_redshift_axis else 0.875
+        else:
+            top_margin = 0.90 if add_redshift_axis else 0.965
+    else:
+        top_margin = float(figure_top_margin)
+
+    if figure_bottom_margin is None:
+        bottom_margin = 0.060 if shared_xlabel else 0.085
+    else:
+        bottom_margin = float(figure_bottom_margin)
+
+    # A little extra room is needed only when the component rows use one
+    # shared figure-level y label.
+    left_margin = 0.085
+    if (
+        compact_component_labels
+        and shared_component_ylabel
+        and len(component_row_indices) > 0
+    ):
+        left_margin = 0.092
+
+    fig.subplots_adjust(
+        left=left_margin,
+        right=0.992,
+        bottom=bottom_margin,
+        top=top_margin,
+        hspace=hspace,
+        wspace=wspace,
+    )
+
+    if (
+        compact_component_labels
+        and shared_component_ylabel
+        and len(component_row_indices) > 0
+    ):
+        component_positions = [
+            axs[row_index, 0].get_position()
+            for row_index in sorted(component_row_indices)
+        ]
+        component_y_bottom = min(position.y0 for position in component_positions)
+        component_y_top = max(position.y1 for position in component_positions)
+        component_y_center = 0.5 * (
+            component_y_bottom + component_y_top
+        )
+
+        fig.text(
+            component_ylabel_x,
+            component_y_center,
+            component_ylabel_text,
+            ha="center",
+            va="center",
+            rotation="vertical",
+            fontsize=fontlabel,
+        )
+
+    diagnostics = pd.DataFrame(diagnostics_rows)
+
+    if save:
+        savefig(
+            savepath,
+            savefigname,
+            TRANSPARENT=TRANSPARENT,
+            SIM=SIM,
+        )
+
+    return fig, axs, diagnostics, selected_ids
+
